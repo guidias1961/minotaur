@@ -375,22 +375,16 @@
 
         function setupCharacterSelection() {
             const options = document.querySelectorAll('.characterOption');
-            
+            const startButton = document.getElementById('startButton');
+
             options.forEach(option => {
-                const newOption = option.cloneNode(true);
-                option.parentNode.replaceChild(newOption, option);
-            });
-
-            const newOptions = document.querySelectorAll('.characterOption');
-
-            newOptions.forEach(option => {
                 const selectCharacter = (e) => {
                     e.preventDefault();
-                    newOptions.forEach(opt => opt.classList.remove('selected'));
+                    options.forEach(opt => opt.classList.remove('selected'));
                     option.classList.add('selected');
                     selectedCharacter = parseInt(option.getAttribute('data-character'));
                     console.log(`Character ${selectedCharacter} selected`);
-                    document.getElementById('startButton').disabled = false;
+                    startButton.disabled = false;
                 };
 
                 option.addEventListener('click', selectCharacter);
@@ -1393,8 +1387,10 @@
                 ctx.beginPath();
                 ctx.moveTo(10 + i * heartSize * 1.5, 10);
                 ctx.bezierCurveTo(10 + i * heartSize * 1.5, 0, 25 + i * heartSize * 1.5, 0, 25 + i * heartSize * 1.5, 10);
-                ctx.bezierCurveTo(25 + i * heartSize * 1.5, 20, 10 + i * heart！
-
-        </script>
+                ctx.bezierCurveTo(25 + i * heartSize * 1.5, 20, 10 + i * heartSize * 1.5, 20, 10 + i * heartSize * 1.5, 10);
+                ctx.fill();
+            }
+        }
+    </script>
 </body>
 </html>
