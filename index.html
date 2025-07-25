@@ -24,10 +24,9 @@
         }
         #gameContainer {
             position: relative;
-            width: 100%;
-            max-width: 800px;
-            aspect-ratio: 4 / 3;
-            margin: 0 auto;
+            width: 100vw;
+            height: 100vh;
+            margin: 0;
         }
         #gameCanvas {
             width: 100%;
@@ -70,7 +69,7 @@
             border-color: gold;
             box-shadow: 0 0 15px gold;
         }
-        #startScreen, #gameOverScreen, #loadingScreen {
+        #startScreen, #gameOverScreen, #loadingScreen, #orientationWarning {
             position: absolute;
             top: 0;
             left: 0;
@@ -84,7 +83,7 @@
             z-index: 10;
             padding: 1rem;
         }
-        #gameOverScreen, #loadingScreen {
+        #gameOverScreen, #loadingScreen, #orientationWarning {
             display: none;
         }
         button {
@@ -107,14 +106,17 @@
             opacity: 0.6;
         }
         #hud {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
             display: flex;
             justify-content: space-between;
-            width: 100%;
-            max-width: 800px;
             padding: 0.5rem;
             font-size: clamp(14px, 2vw, 16px);
             flex-wrap: wrap;
             gap: 0.5rem;
+            z-index: 5;
         }
         .instructions {
             margin: 1rem;
@@ -156,18 +158,34 @@
                 height: 60px;
             }
         }
+        @media (orientation: portrait) and (max-width: 600px) {
+            #orientationWarning {
+                display: flex;
+            }
+            #gameCanvas, #hud, #touchControls {
+                display: none;
+            }
+        }
+        @media (orientation: landscape) and (max-width: 600px) {
+            #orientationWarning {
+                display: none;
+            }
+            #gameCanvas, #hud, #touchControls {
+                display: block;
+            }
+        }
     </style>
 </head>
 <body>
-    <h1>Minotaur Maze</h1>
-    <div id="hud">
-        <div id="score">Satoshis: 0</div>
-        <div id="time">Time: 0</div>
-        <div id="relics">Bitcoins: 0/5</div>
-        <div id="bombs">Bombs: 0</div>
-        <div id="phase">Phase: 1</div>
-    </div>
     <div id="gameContainer">
+        <h1>Minotaur Maze</h1>
+        <div id="hud">
+            <div id="score">Satoshis: 0</div>
+            <div id="time">Time: 0</div>
+            <div id="relics">Bitcoins: 0/5</div>
+            <div id="bombs">Bombs: 0</div>
+            <div id="phase">Phase: 1</div>
+        </div>
         <canvas id="gameCanvas"></canvas>
         
         <div id="loadingScreen">
@@ -204,6 +222,10 @@
             <div id="finalPhase">Phase: 1</div>
             <button id="restartButton">Play Again</button>
         </div>
+
+        <div id="orientationWarning">
+            <h2>Gire o celular para jogar melhor em modo paisagem 🎮</h2>
+        </div>
     </div>
 
     <div id="touchControls">
@@ -221,8 +243,8 @@
     <script>
         // Game Constants
         let TILE_SIZE = 40;
-        let CANVAS_WIDTH = 800;
-        let CANVAS_HEIGHT = 600;
+        let CANVAS_WIDTH = window.innerWidth;
+        let CANVAS_HEIGHT = window.innerHeight;
         const BASE_PLAYER_SPEED = 3;
         const BASE_ENEMY_SPEED = 1.5;
         const BITCOINS_TO_WIN = 5;
@@ -293,6 +315,7 @@
             
             resizeCanvas();
             window.addEventListener('resize', resizeCanvas);
+            document.addEventListener('fullscreenchange', resizeCanvas);
             setupCharacterSelection();
             document.getElementById('startButton').addEventListener('click', startGame);
             document.getElementById('restartButton').addEventListener('click', restartGame);
@@ -303,20 +326,52 @@
 
         function resizeCanvas() {
             const container = document.getElementById('gameContainer');
-            const maxWidth = Math.min(window.innerWidth * 0.95, 800);
-            const maxHeight = Math.min(window.innerHeight * 0.8, maxWidth / ASPECT_RATIO);
-            
-            CANVAS_WIDTH = Math.floor(maxWidth * 2);
-            CANVAS_HEIGHT = Math.floor(maxWidth / ASPECT_RATIO * 2);
+            CANVAS_WIDTH = window.innerWidth;
+            CANVAS_HEIGHT = window.innerHeight;
+
+            // Maintain aspect ratio
+            if (CANVAS_WIDTH / CANVAS_HEIGHT > ASPECT_RATIO) {
+                CANVAS_WIDTH = CANVAS_HEIGHT * ASPECT_RATIO;
+            } else {
+                CANVAS_HEIGHT = CANVAS_WIDTH / ASPECT_RATIO;
+            }
+
+            CANVAS_WIDTH = Math.floor(CANVAS_WIDTH);
+            CANVAS_HEIGHT = Math.floor(CANVAS_HEIGHT);
             TILE_SIZE = Math.floor(CANVAS_WIDTH / 20);
             
             canvas.width = CANVAS_WIDTH;
             canvas.height = CANVAS_HEIGHT;
-            canvas.style.width = `${maxWidth}px`;
-            canvas.style.height = `${maxHeight}px`;
+            canvas.style.width = `${CANVAS_WIDTH}px`;
+            canvas.style.height = `${CANVAS_HEIGHT}px`;
             
             if (ctx) {
                 ctx.imageSmoothingEnabled = true;
+            }
+
+            // Update game objects' sizes
+            if (player) {
+                player.width = TILE_SIZE * 1.1;
+                player.height = TILE_SIZE * 1.1;
+                player.collisionWidth = TILE_SIZE * 0.8;
+                player.collisionHeight = TILE_SIZE * 0.8;
+                player.speed = BASE_PLAYER_SPEED * (CANVAS_WIDTH/800);
+            }
+            enemies.forEach(enemy => {
+                enemy.width = TILE_SIZE * 0.96;
+                enemy.height = TILE_SIZE * 0.96;
+                enemy.speed = enemy.type.baseSpeed * (CANVAS_WIDTH/800) * (1 + currentPhase * 0.1);
+            });
+            bitcoins.forEach(bitcoin => {
+                bitcoin.width = TILE_SIZE/2;
+                bitcoin.height = TILE_SIZE/2;
+            });
+            explosions.forEach(explosion => {
+                explosion.radius = BOMB_RADIUS * (CANVAS_WIDTH/800);
+            });
+
+            if (gameRunning) {
+                generateMaze();
             }
         }
 
@@ -349,6 +404,15 @@
             if (!selectedCharacter) {
                 alert('Please select a character first!');
                 return;
+            }
+
+            // Enter fullscreen on desktop
+            if (!/Mobi|Android/i.test(navigator.userAgent)) {
+                try {
+                    await document.getElementById('gameContainer').requestFullscreen();
+                } catch (err) {
+                    console.warn('Failed to enter fullscreen:', err);
+                }
             }
 
             document.getElementById('startButton').disabled = true;
@@ -982,7 +1046,7 @@
             }
             
             const tileX = Math.floor(player.x / TILE_SIZE);
-            const tileY = Math.floor(player.y / TILE_SIZE);
+            const tileY = conozle.log(player.y / TILE_SIZE);
             const attackTiles = [
                 { x: tileX, y: tileY - 1 },
                 { x: tileX, y: tileY + 1 },
@@ -1117,7 +1181,7 @@
             
             for (let i = explosions.length - 1; i >= 0; i--) {
                 explosions[i].time -= deltaTime;
-                if (explosions[i].time <= 0) {
+                if (exploons[i].time <= 0) {
                     explosions.splice(i, 1);
                 }
             }
