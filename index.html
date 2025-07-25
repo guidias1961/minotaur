@@ -36,7 +36,7 @@
             box-shadow: 0 0 20px #000;
             background-color: #111;
             display: block;
-            image-rendering: auto;
+            image-rendering: auto; /* Disable pixelation for smoother graphics */
         }
         #characterSelect {
             margin: 2rem 0;
@@ -60,7 +60,7 @@
         .characterOption img {
             max-width: 100%;
             max-height: 100%;
-            image-rendering: auto;
+            image-rendering: auto; /* Improve image quality */
         }
         .characterOption:hover {
             border-color: #888;
@@ -252,16 +252,6 @@
         let assetsLoaded = 0;
         let totalAssets = 0;
         
-        // Map Assets
-        let wall1 = new Image();
-        wall1.src = 'map/block1.png';
-        let wall2 = new Image();
-        wall2.src = 'map/block2.png';
-        let floor1 = new Image();
-        floor1.src = 'map/background1.png';
-        let floor2 = new Image();
-        floor2.src = 'map/background2.png';
-        
         // Sprite Animation Variables
         let playerSprites = {
             idle: [], walking: [], attacking: [], dying: []
@@ -289,7 +279,7 @@
         window.onload = function() {
             canvas = document.getElementById('gameCanvas');
             ctx = canvas.getContext('2d');
-            ctx.imageSmoothingEnabled = true;
+            ctx.imageSmoothingEnabled = true; /* Enable anti-aliasing for smoother graphics */
             
             resizeCanvas();
             window.addEventListener('resize', resizeCanvas);
@@ -298,6 +288,7 @@
             document.getElementById('restartButton').addEventListener('click', restartGame);
             setupTouchControls();
             
+            // Update start button state based on initial character selection
             document.getElementById('startButton').disabled = !selectedCharacter;
         };
 
@@ -306,7 +297,7 @@
             const maxWidth = Math.min(window.innerWidth * 0.95, 800);
             const maxHeight = Math.min(window.innerHeight * 0.8, maxWidth / ASPECT_RATIO);
             
-            CANVAS_WIDTH = Math.floor(maxWidth * 2);
+            CANVAS_WIDTH = Math.floor(maxWidth * 2); // Double resolution for better quality
             CANVAS_HEIGHT = Math.floor(maxWidth / ASPECT_RATIO * 2);
             TILE_SIZE = Math.floor(CANVAS_WIDTH / 20);
             
@@ -323,11 +314,13 @@
         function setupCharacterSelection() {
             const options = document.querySelectorAll('.characterOption');
             
+            // Ensure any previous listeners are removed to prevent duplicates
             options.forEach(option => {
                 const newOption = option.cloneNode(true);
                 option.parentNode.replaceChild(newOption, option);
             });
 
+            // Re-query after replacing nodes
             const newOptions = document.querySelectorAll('.characterOption');
 
             newOptions.forEach(option => {
@@ -1074,7 +1067,7 @@
                     enemy.direction.x *= -1;
                 }
                 
-                if (!checkWallCollision(enemy.x, newY, enemy.width, employee.height)) {
+                if (!checkWallCollision(enemy.x, newY, enemy.width, enemy.height)) {
                     enemy.y = newY;
                 } else {
                     enemy.direction.y *= -1;
@@ -1221,7 +1214,7 @@
 
         function render() {
             ctx.clearRect(0, 0, canvas.width, canvas.height);
-            ctx.imageSmoothingEnabled = true;
+            ctx.imageSmoothingEnabled = true; /* Ensure anti-aliasing during rendering */
             
             drawMaze();
             drawBitcoins();
@@ -1232,6 +1225,15 @@
         }
 
         function drawMaze() {
+            const wall1 = new Image();
+            wall1.src = 'map/block1.png';
+            const wall2 = new Image();
+            wall2.src = 'map/block2.png';
+            const floor1 = new Image();
+            floor1.src = 'map/background1.png';
+            const floor2 = new Image();
+            floor2.src = 'map/background2.png';
+            
             const COLS = Math.floor(CANVAS_WIDTH / TILE_SIZE);
             const ROWS = Math.floor(CANVAS_HEIGHT / TILE_SIZE);
             
@@ -1315,7 +1317,7 @@
             const frameIndex = Math.min(currentFrame, playerSprites[currentAnimation].length - 1);
             const sprite = playerSprites[currentAnimation][frameIndex];
             
-            ctx.imageSmoothingEnabled = true;
+            ctx.imageSmoothingEnabled = true; /* Smooth sprite rendering */
             ctx.drawImage(sprite, -player.width/2, -player.height/2, player.width, player.height);
             
             ctx.restore();
