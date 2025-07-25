@@ -36,6 +36,7 @@
             box-shadow: 0 0 20px #000;
             background-color: #111;
             display: block;
+            image-rendering: auto; /* Disable pixelation for smoother graphics */
         }
         #characterSelect {
             margin: 2rem 0;
@@ -59,6 +60,7 @@
         .characterOption img {
             max-width: 100%;
             max-height: 100%;
+            image-rendering: auto; /* Improve image quality */
         }
         .characterOption:hover {
             border-color: #888;
@@ -277,6 +279,7 @@
         window.onload = function() {
             canvas = document.getElementById('gameCanvas');
             ctx = canvas.getContext('2d');
+            ctx.imageSmoothingEnabled = true; /* Enable anti-aliasing for smoother graphics */
             
             resizeCanvas();
             window.addEventListener('resize', resizeCanvas);
@@ -294,17 +297,17 @@
             const maxWidth = Math.min(window.innerWidth * 0.95, 800);
             const maxHeight = Math.min(window.innerHeight * 0.8, maxWidth / ASPECT_RATIO);
             
-            CANVAS_WIDTH = Math.floor(maxWidth);
-            CANVAS_HEIGHT = Math.floor(maxWidth / ASPECT_RATIO);
+            CANVAS_WIDTH = Math.floor(maxWidth * 2); // Double resolution for better quality
+            CANVAS_HEIGHT = Math.floor(maxWidth / ASPECT_RATIO * 2);
             TILE_SIZE = Math.floor(CANVAS_WIDTH / 20);
             
             canvas.width = CANVAS_WIDTH;
             canvas.height = CANVAS_HEIGHT;
-            canvas.style.width = `${CANVAS_WIDTH}px`;
-            canvas.style.height = `${CANVAS_HEIGHT}px`;
+            canvas.style.width = `${maxWidth}px`;
+            canvas.style.height = `${maxHeight}px`;
             
             if (ctx) {
-                ctx.imageSmoothingEnabled = false;
+                ctx.imageSmoothingEnabled = true;
             }
         }
 
@@ -1211,6 +1214,7 @@
 
         function render() {
             ctx.clearRect(0, 0, canvas.width, canvas.height);
+            ctx.imageSmoothingEnabled = true; /* Ensure anti-aliasing during rendering */
             
             drawMaze();
             drawBitcoins();
@@ -1313,6 +1317,7 @@
             const frameIndex = Math.min(currentFrame, playerSprites[currentAnimation].length - 1);
             const sprite = playerSprites[currentAnimation][frameIndex];
             
+            ctx.imageSmoothingEnabled = true; /* Smooth sprite rendering */
             ctx.drawImage(sprite, -player.width/2, -player.height/2, player.width, player.height);
             
             ctx.restore();
