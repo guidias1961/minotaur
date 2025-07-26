@@ -570,7 +570,7 @@
             const pos = findEmptyCell();
             
             const itemImage = new Image();
-            itemImage.src = `collectabes/${randomItemId}.png`;
+            itemImage.src = `/collectabes/${randomItemId}.png`;
             
             currentPhaseItem = {
                 x: pos.x * TILE_SIZE + TILE_SIZE/2,
@@ -638,7 +638,7 @@
                 itemDiv.className = 'inventoryItem';
                 
                 const itemImg = document.createElement('img');
-                itemImg.src = `collectabes/${itemId}.png`;
+                itemImg.src = `/collectabes/${itemId}.png`;
                 itemImg.alt = `Item ${itemId}`;
                 itemImg.onerror = () => {
                     // Fallback if image doesn't load
@@ -1675,18 +1675,27 @@
             }
         }
 
-    </script>
-</body>
-</html>
+        async function loadSprites(character) {
+            const animations = ['Idle', 'Walking', 'Attacking', 'Dying'];
+            playerSprites = { idle: [], walking: [], attacking: [], dying: [] };
+            totalAssets += animations.length * 12;
+            
+            const loadImage = (path, fallbackColor) => {
+                return new Promise((resolve) => {
+                    const img = new Image();
+                    img.onload = () => {
+                        assetsLoaded++;
+                        updateLoadingProgress();
+                        resolve(img);
+                    };
+                    img.onerror = () => {
+                        console.warn(`Failed to load image: ${path}`);
                         const canvas = document.createElement('canvas');
-                        canvas.width = 64;
-                        canvas.height = 64;
+                        canvas.width = TILE_SIZE;
+                        canvas.height = TILE_SIZE;
                         const ctx = canvas.getContext('2d');
-                        ctx.fillStyle = fallbackColor;
-                        ctx.fillRect(0, 0, 64, 64);
-                        ctx.fillStyle = '#000';
-                        ctx.font = '10px Arial';
-                        ctx.fillText(`M${character}`, 10, 30);
+                        ctx.fillStyle = '#333';
+                        ctx.fillRect(0, 0, TILE_SIZE, TILE_SIZE);
                         assetsLoaded++;
                         updateLoadingProgress();
                         resolve(canvas);
@@ -1763,3 +1772,27 @@
                     };
                     img.onerror = () => {
                         console.warn(`Failed to load image: ${path}`);
+                        const canvas = document.createElement('canvas');
+                        canvas.width = 64;
+                        canvas.height = 64;
+                        const ctx = canvas.getContext('2d');
+                        ctx.fillStyle = '#333';
+                        ctx.fillRect(0, 0, 64, 64);
+                        assetsLoaded++;
+                        updateLoadingProgress();
+                        resolve(canvas);
+                    };
+                    img.src = path;
+                });
+            };
+            
+            return Promise.all([
+                loadImage(wall1, 'map/block1.png'),
+                loadImage(wall2, 'map/block2.png'),
+                loadImage(floor1, 'map/background1.png'),
+                loadImage(floor2, 'map/background2.png')
+            ]);
+        }
+    </script>
+</body>
+</html>
