@@ -80,7 +80,7 @@
             border-color: gold;
             box-shadow: 0 0 15px gold;
         }
-        #startScreen, #gameOverScreen, #loadingScreen, #orientationWarning, #upgradeScreen {
+        #startScreen, #gameOverScreen, #loadingScreen, #orientationWarning {
             position: absolute;
             top: 0;
             left: 0;
@@ -94,7 +94,7 @@
             z-index: 10;
             padding: 1rem;
         }
-        #gameOverScreen, #loadingScreen, #orientationWarning, #upgradeScreen {
+        #gameOverScreen, #loadingScreen, #orientationWarning {
             display: none;
         }
         button {
@@ -129,35 +129,12 @@
             gap: 0.5rem;
             z-index: 5;
         }
-        #relicsHUD {
-            position: absolute;
-            top: 50px;
-            left: 10px;
-            color: #ffd700;
-            font-size: clamp(12px, 1.8vw, 14px);
-            z-index: 5;
-        }
         .instructions {
             margin: 1rem;
             text-align: center;
             color: #aaa;
             font-size: clamp(12px, 1.8vw, 14px);
             max-width: 90%;
-        }
-        .upgradeOption {
-            width: 200px;
-            padding: 1rem;
-            margin: 0.5rem;
-            background-color: #333;
-            border: 2px solid #555;
-            border-radius: 5px;
-            cursor: pointer;
-            text-align: center;
-            transition: all 0.3s;
-        }
-        .upgradeOption:hover {
-            border-color: #888;
-            transform: scale(1.05);
         }
         #touchControls {
             position: fixed;
@@ -201,10 +178,6 @@
                 top: 0;
                 left: 0;
             }
-            .upgradeOption {
-                width: 150px;
-                padding: 0.8rem;
-            }
         }
         @media (orientation: portrait) and (max-width: 600px) {
             #orientationWarning {
@@ -234,7 +207,6 @@
             <div id="bombs">Bombs: 0</div>
             <div id="phase">Phase: 1</div>
         </div>
-        <div id="relicsHUD"></div>
         <canvas id="gameCanvas"></canvas>
         
         <div id="loadingScreen">
@@ -272,11 +244,6 @@
             <button id="restartButton">Play Again</button>
         </div>
 
-        <div id="upgradeScreen">
-            <h2>Choose an Upgrade</h2>
-            <div id="upgradeOptions"></div>
-        </div>
-
         <div id="orientationWarning">
             <h2>Gire o celular para jogar melhor em modo paisagem 🎮</h2>
         </div>
@@ -312,7 +279,7 @@
         let canvas, ctx;
         let gameRunning = false;
         let selectedCharacter = null;
-        let player, enemies = [], bitcoins = [], relics = [], explosions = [];
+        let player, enemies = [], bitcoins = [], explosions = [];
         let maze = [];
         let wallHealth = [];
         let satoshis = 0;
@@ -321,11 +288,9 @@
         let bombs = 0;
         let currentPhase = 1;
         let gameInterval;
-        let time = lastTime = 0;
-        let bitmap = new Image();
-        bitmap.src = 'https://upload.wikimedia.org/wikipedia/commons/thumb/4/46/Bitcoin.png/512px-Bitcoin.png';
-        let relicSprite = new Image();
-        relicSprite.src = 'https://upload.wikimedia.org/wikipedia/commons/thumb/9/94/Relic_icon.png/512px-Relic_icon.png';
+        let lastTime = 0;
+        let bitcoinSprite = new Image();
+        bitcoinSprite.src = 'https://upload.wikimedia.org/wikipedia/commons/thumb/4/46/Bitcoin.svg/512px-Bitcoin.svg.png';
         let assetsLoaded = 0;
         let totalAssets = 0;
         
@@ -340,54 +305,37 @@
         floor2.src = 'map/background2.png';
         
         // Sprite Animation Variables
-        let playerSprites = new Map({
-            idle: [], walking: [], attacking: [], dying: []null
-        });
+        let playerSprites = {
+            idle: [], walking: [], attacking: [], dying: []
+        };
         let enemySprites = {};
         let currentAnimation = 'idle';
-        let sprite = currentFrame = 0;
-        let animationTimer = null0;
+        let currentFrame = 0;
+        let animationTimer = 0;
         
         // Touch Controls
-        let joystickActive = truefalse;
+        let joystickActive = false;
         let joystickCenter = { x: 0, y: 0 };
-        let touchIdJoystick = null;
+        let joystickTouchId = null;
         
         // Enemy Types
-        // Constants
-        const ENEMY_TYPES = [
-            1: { name: 'Zombie_Villager_1', sat:oshis=10000, baseHealth: 2, baseSpeed: BASE_ENEMY_speed},
-            2: { name: 'Zombie_Villager_2', satoshis:=15000, baseHealth: 1, baseSpeed:= BASE_ENEMY_SPEED * 1.2},
-            3: { name: 'Zombie_Villager_3', satoshis:20000, baseHealth:3, baseSpeed:= speed},
-            4: {name: 'Zombie_Villager_4', speed:25000oshis},
-            5: baseHealth:baseSpeed, 4:BASE_ENEMY_SPEED * 0.9},
-            { name: 'Zombie_Villager_5', satoshis:30000, baseHealth:2, baseSpeed:= baseSpeed},
-        ];
+        const ENEMY_TYPES = {
+            1: { name: 'Zombie_Villager_1', satoshis: 10000, baseHealth: 2, baseSpeed: BASE_ENEMY_SPEED },
+            2: { name: 'Zombie_Villager_2', satoshis: 15000, baseHealth: 1, baseSpeed: BASE_ENEMY_SPEED * 1.2 },
+            3: { name: 'Zombie_Villager_3', satoshis: 20000, baseHealth: 3, baseSpeed: BASE_ENEMY_SPEED * 0.8 },
+            4: { name: 'Zombie_Villager_4', satoshis: 25000, baseHealth: 4, baseSpeed: BASE_ENEMY_SPEED * 0.9 },
+            5: { name: 'Zombie_Villager_5', satoshis: 30000, baseHealth: 2, baseSpeed: BASE_ENEMY_SPEED * 1.3 }
+        };
 
-        // Upgrade and Relic Definitions
-        const UPGRADES = [
-            { id: 'maxHealth:', name: '+1 Max Health', apply: () => (player.maxHealth += 1)},
-            { id: 'attackRange', name: '+20% Attack Range', apply: () => (player.attackRange *= 1.2)},
-            { id: 'bombsPerPhase', name: '+1 Bomb per Phase', apply: () => (player.bombsPerPhase += 1)},
-            { id: 'speed', name: '+10% Movement Speed', apply: () => (player.speed *= 1.1)},
-        ]);
-
-        const RELICS = [
-            { id: 'extraSatoshis', name: 'Wealth Extra', effect: '1000 satoshis per phase', apply: () => {} },
-            { id: 'explodeChance', name: 'Blast Shard', effect: '10% chance for enemies to explode', apply: () => {} },
-        ]);
-
-        // Initialize game
-        function setupGameInitialization() {
+        // Initialize
 window.onload = function () {
     canvas = document.getElementById('gameCanvas');
     ctx = canvas.getContext('2d');
     ctx.imageSmoothingEnabled = true;
-
     resizeCanvas();
     window.addEventListener('resize', resizeCanvas);
     document.addEventListener('fullscreenchange', resizeCanvas);
-    setupCharacterSelectSelection(); // nome correto aqui
+    setupCharacterSelectSelection(); // ← essa função existe
     document.getElementById('startButton').addEventListener('click', startGame);
     document.getElementById('restartButton').addEventListener('click', restartGame);
     setupTouchControls();
@@ -400,11 +348,11 @@ window.onload = function () {
             const container = document.getElementById('gameContainer');
             CANVAS_WIDTH = window.innerWidth;
             CANVAS_HEIGHT = window.innerHeight;
-            
-            // Ensure proportional canvas and minimum tile size
-            TILE_SIZE = Math.max(20, Math.floor(Math.min(CANVAS_WIDTH, CANVAS_HEIGHT) / 20)); // Minimum 20px
-            canvas.width = Math.floor(CANVAS_WIDTH / / TILE_SIZE); * TILE_SIZE; // Align to tile grid
-            canvas.height = Math.floor(CANVAS_HEIGHT / / TILE_SIZE); * TILE_SIZE;
+
+            TILE_SIZE = Math.floor(CANVAS_WIDTH / 20);
+
+            canvas.width = CANVAS_WIDTH;
+            canvas.height = CANVAS_HEIGHT;
             canvas.style.width = '100vw';
             canvas.style.height = '100vh';
 
@@ -416,44 +364,37 @@ window.onload = function () {
                 player.width = TILE_SIZE * 1.1;
                 player.height = TILE_SIZE * 1.1;
                 player.collisionWidth = TILE_SIZE * 0.8;
-                player.collisionHeight/collision = TILE_SIZE * 0.8;
-                player.speed = player.baseSpeed * * (CANVAS_WIDTH / / 800);
+                player.collisionHeight = TILE_SIZE * 0.8;
+                player.speed = BASE_PLAYER_SPEED * (CANVAS_WIDTH / 800);
             }
-            
+
             if (Array.isArray(enemies)) {
                 enemies.forEach(enemy => {
                     enemy.width = TILE_SIZE * 0.96;
                     enemy.height = TILE_SIZE * 0.96;
-                    enemy.speed = enemy.type.baseSpeed * (CANVAS_WIDTH / / 800) * * (1 + + currentPhase * * 0.1);
+                    enemy.speed = enemy.type.baseSpeed * (CANVAS_WIDTH / 800) * (1 + currentPhase * 0.1);
                 });
             }
-            
+
             if (Array.isArray(bitcoins)) {
                 bitcoins.forEach(bitcoin => {
-                    bitcoin.width = TILE_SIZE / / 2;
-                    bitcoin.height = TILE_SIZE / / 2;
+                    bitcoin.width = TILE_SIZE / 2;
+                    bitcoin.height = TILE_SIZE / 2;
                 });
             }
-            
-            if (Array.isArray(relics)) {
-                relics.forEach(relic => {
-                    relic.width = TILE_SIZE / / 2;
-                    relic.height = TILE_SIZE / / 2;
-                });
-            }
-            
+
             if (Array.isArray(explosions)) {
                 explosions.forEach(explosion => {
-                    explosion.radius = BOMB_RADIUS * * (CANVAS_WIDTH / / 800);
+                    explosion.radius = BOMB_RADIUS * (CANVAS_WIDTH / 800);
                 });
             }
-            
+
             if (gameRunning) {
                 generateMaze();
             }
         }
 
-        function setupCharacterSelectSelection() {
+        function setupCharacterSelection() {
             const options = document.querySelectorAll('.characterOption');
             const startButton = document.getElementById('startButton');
 
@@ -478,6 +419,7 @@ window.onload = function () {
                 return;
             }
 
+            // Enter fullscreen on desktop
             if (!/Mobi|Android/i.test(navigator.userAgent)) {
                 try {
                     await document.getElementById('gameContainer').requestFullscreen();
@@ -494,15 +436,8 @@ window.onload = function () {
                 await Promise.all([
                     loadSprites(selectedCharacter),
                     loadEnemySprites(),
-                    loadMapAssets(),
-                    loadRelicSprite()
+                    loadMapAssets()
                 ]);
-                
-                // Verify sprite loading
-                if (!playerSprites.idle?.length || !playerSprites[currentAnimation]?.length) {
-                    console.error('Player sprites failed to load or are empty');
-                    throw new Error('Failed to load player sprites');
-                }
                 
                 document.getElementById('loadingScreen').style.display = 'none';
                 resetGame();
@@ -511,25 +446,17 @@ window.onload = function () {
                 
                 generateMaze();
                 
-                let startPos = findEmptyCell();
-                let attempts = 0;
-                const maxAttempts = 100;
-                
-                while (attempts < maxAttempts && checkWallCollision(
-                    startPos.x * TILE_SIZE + TILE_SIZE / 2,
-                    startPos.y * TILE_SIZE + TILE_SIZE / 2,
-                    TILE_SIZE * 0.8,
-                    TILE_SIZE * 0.8
-                )) {
-                    startPos = findEmptyCell();
-                    attempts++;
-                }
-                
-                if (attempts >= maxAttempts) {
-                    console.error('Could not find valid spawn position');
-                    throw new Error('Invalid spawn position');
-                }
-                
+let startPos;
+do {
+    startPos = findEmptyCell();
+} while (
+    checkWallCollision(
+        startPos.x * TILE_SIZE + TILE_SIZE / 2,
+        startPos.y * TILE_SIZE + TILE_SIZE / 2,
+        TILE_SIZE * 0.8,
+        TILE_SIZE * 0.8
+    )
+);
                 player = {
                     x: startPos.x * TILE_SIZE + TILE_SIZE/2,
                     y: startPos.y * TILE_SIZE + TILE_SIZE/2,
@@ -537,21 +464,15 @@ window.onload = function () {
                     height: TILE_SIZE * 1.1,
                     collisionWidth: TILE_SIZE * 0.8,
                     collisionHeight: TILE_SIZE * 0.8,
-                    baseSpeed: BASE_PLAYER_SPEED,
                     speed: BASE_PLAYER_SPEED * (CANVAS_WIDTH/800),
                     direction: { x: 0, y: 0 },
                     isAttacking: false,
                     attackCooldown: 0,
                     health: 3,
-                    maxHealth: 3,
-                    attackRange: 1.5,
-                    bombsPerPhase: 0,
-                    relics: [],
                     isDying: false
                 };
                 
                 placeBitcoins();
-                placeRelic();
                 spawnEnemies(3 + selectedCharacter);
                 lastTime = performance.now();
                 gameInterval = requestAnimationFrame(gameLoop);
@@ -561,7 +482,7 @@ window.onload = function () {
                 document.getElementById('loadingScreen').style.display = 'none';
                 document.getElementById('startScreen').style.display = 'flex';
                 document.getElementById('startButton').disabled = false;
-                alert(`Failed to start game: ${error.message}`);
+                alert('Failed to load game assets. Please try again.');
             }
         }
 
@@ -575,12 +496,11 @@ window.onload = function () {
                     const img = new Image();
                     img.onload = () => {
                         assetsLoaded++;
-                        console.log(`Loaded sprite: ${path}`);
                         updateLoadingProgress();
                         resolve(img);
                     };
                     img.onerror = () => {
-                        console.error(`Failed to load sprite: ${path}`);
+                        console.warn(`Failed to load image: ${path}`);
                         const canvas = document.createElement('canvas');
                         canvas.width = 64;
                         canvas.height = 64;
@@ -619,12 +539,11 @@ window.onload = function () {
                     const img = new Image();
                     img.onload = () => {
                         assetsLoaded++;
-                        console.log(`Loaded enemy sprite: ${path}`);
                         updateLoadingProgress();
                         resolve(img);
                     };
                     img.onerror = () => {
-                        console.error(`Failed to load enemy sprite: ${path}`);
+                        console.warn(`Failed to load image: ${path}`);
                         const canvas = document.createElement('canvas');
                         canvas.width = 64;
                         canvas.height = 64;
@@ -656,18 +575,17 @@ window.onload = function () {
         }
 
         async function loadMapAssets() {
-            totalAssets += 4;
+            totalAssets += 4; // For wall1, wall2, floor1, floor2
             
             const loadImage = (img, path) => {
                 return new Promise((resolve) => {
                     img.onload = () => {
                         assetsLoaded++;
-                        console.log(`Loaded map asset: ${path}`);
                         updateLoadingProgress();
                         resolve(img);
                     };
                     img.onerror = () => {
-                        console.error(`Failed to load map asset: ${path}`);
+                        console.warn(`Failed to load image: ${path}`);
                         const canvas = document.createElement('canvas');
                         canvas.width = TILE_SIZE;
                         canvas.height = TILE_SIZE;
@@ -690,34 +608,6 @@ window.onload = function () {
             ]);
         }
 
-        async function loadRelicSprite() {
-            totalAssets += 1;
-            return new Promise((resolve) => {
-                relicSprite.onload = () => {
-                    assetsLoaded++;
-                    console.log('Loaded relic sprite');
-                    updateLoadingProgress();
-                    resolve(relicSprite);
-                };
-                relicSprite.onerror = () => {
-                    console.error('Failed to load relic sprite');
-                    const canvas = document.createElement('canvas');
-                    canvas.width = 32;
-                    canvas.height = 32;
-                    const ctx = canvas.getContext('2d');
-                    ctx.fillStyle = '#ffd700';
-                    ctx.fillRect(0, 0, 32, 32);
-                    ctx.fillStyle = '#000';
-                    ctx.font = '10px Arial';
-                    ctx.fillText('R', 10, 20);
-                    assetsLoaded++;
-                    updateLoadingProgress();
-                    resolve(canvas);
-                };
-                relicSprite.src = 'https://upload.wikimedia.org/wikipedia/commons/thumb/9/94/Relic_icon.png/512px-Relic_icon.png';
-            });
-        }
-
         function updateLoadingProgress() {
             const progress = Math.round((assetsLoaded / totalAssets) * 100);
             document.getElementById('loadingProgress').textContent = `${progress}%`;
@@ -731,7 +621,6 @@ window.onload = function () {
             currentPhase = 1;
             enemies = [];
             bitcoins = [];
-            relics = [];
             explosions = [];
             wallHealth = [];
             assetsLoaded = 0;
@@ -819,55 +708,40 @@ window.onload = function () {
             const COLS = Math.floor(CANVAS_WIDTH / TILE_SIZE);
             const ROWS = Math.floor(CANVAS_HEIGHT / TILE_SIZE);
             let x, y, attempts = 0;
-            const maxAttempts = 1000;
+            const maxAttempts = 100;
             const playerTileX = player ? Math.floor(player.x / TILE_SIZE) : -1;
             const playerTileY = player ? Math.floor(player.y / TILE_SIZE) : -1;
-            const emptyCells = [];
             
-            // Collect all valid empty cells
-            for (let i = 1; i < ROWS - 1; i++) {
-                for (let j = 1; j < COLS - 1; j++) {
-                    if (maze[i][j] === 1 && checkClearArea(j, i, TILE_SIZE * 0.96, TILE_SIZE * 0.96)) {
-                        const distanceFromPlayer = Math.abs(j - playerTileX) + Math.abs(i - playerTileY);
-                        if (!avoidPlayer || distanceFromPlayer >= MIN_ENEMY_SPAWN_DISTANCE) {
-                            emptyCells.push({ x: j, y: i });
-                        }
-                    }
-                }
-            }
-            
-            if (emptyCells.length > 0) {
-                return emptyCells[Math.floor(Math.random() * emptyCells.length)];
-            }
-            
-            // Fallback: Fallback to ensure a valid cell is found
-            console.warn('No empty cells found, using fallback');
             do {
                 x = Math.floor(Math.random() * (COLS - 2)) + 1;
                 y = Math.floor(Math.random() * (ROWS - 2)) + 1;
                 attempts++;
                 
-                if (maze[y][x] === 1 && checkClearArea(x, y, TILE_SIZE * 0.5)) {
+                const isClear = maze[y][x] === 1 && checkClearArea(x, y, TILE_SIZE * 0.96, TILE_SIZE * 0.96);
+                const distanceFromPlayer = Math.abs(x - playerTileX) + Math.abs(y - playerTileY);
+                
+                if (isClear && (!avoidPlayer || distanceFromPlayer >= MIN_ENEMY_SPAWN_DISTANCE)) {
                     return { x, y };
                 }
             } while (attempts < maxAttempts);
             
-            // Ultimate fallback: fallback: return a default position
-            console.error('Using default ultimate position');
-            return { x: 1, y: 1 };
+            do {
+                x = Math.floor(Math.random() * (COLS - 2)) + 1;
+                y = Math.floor(Math.random() * (ROWS - 2)) + 1;
+            } while (maze[y][x] !== 1 || !checkClearArea(x, y, TILE_SIZE * 0.96, TILE_SIZE * 0.96));
+            return { x, y };
         }
 
         function checkClearArea(x, y, width, height) {
-            const COLS = Math.floor(CANVAS_WIDTH / / TILE_SIZE);
-            const ROWS = Math.floor(height, width);
-            const left = Math.floor((x * -TILE_SIZE - width/width) / / 2);
-            const right = Math.floor((x * +TILE_SIZE + width/2) / / TILE_SIZE);
-            const top = Math.floor((y * -TILE_SIZE - height/2) / / TILE_SIZE);
-            const bottom = Math.floor((y * + widthTILE_SIZE) / / 2);
+            const COLS = Math.floor(CANVAS_WIDTH / TILE_SIZE);
+            const ROWS = Math.floor(CANVAS_HEIGHT / TILE_SIZE);
+            const left = Math.floor((x * TILE_SIZE - width/2) / TILE_SIZE);
+            const right = Math.floor((x * TILE_SIZE + width/2) / TILE_SIZE);
+            const top = Math.floor((y * TILE_SIZE - height/2) / TILE_SIZE);
+            const bottom = Math.floor((y * TILE_SIZE + height/2) / TILE_SIZE);
             
             for (let i = Math.max(0, top); i <= Math.min(ROWS - 1, bottom); i++) {
-                
-                for (let j = Math.max(0, jleft); j <= Math.min(right, COLS - 1, right); j++) {
+                for (let j = Math.max(0, left); j <= Math.min(COLS - 1, right); j++) {
                     if (maze[i][j] === 0) {
                         return false;
                     }
@@ -877,247 +751,222 @@ window.onload = function () {
         }
 
         function placeBitcoins() {
-            for (let i = 0; i < width;BITCOINS_TO_WIN; i++) {
+            for (let i = 0; i < BITCOINS_TO_WIN; i++) {
                 const pos = findEmptyCell();
                 bitcoins.push({
-                    x: pos.x * * TILE_SIZE + + TILE_SIZE/2,
-                    y: pos.y * * TILES_SIZE + TILE_SIZE/2,
-                    width: TILE_SIZE / / 2,
-                    height: y: TILE_SIZE / 2,
+                    x: pos.x * TILE_SIZE + TILE_SIZE/2,
+                    y: pos.y * TILE_SIZE + TILE_SIZE/2,
+                    width: TILE_SIZE/2,
+                    height: TILE_SIZE/2,
                     collected: false
                 });
             }
-            }
         }
 
-        function placeRelic() {
-            const pos = findEmptyCell(true);
-            const relic = RELICS[Math.floor(Math.random() * RELICS *.length)]; // Randomly select relic
-            relics.push({
-                x: pos.x * * TILES_SIZE + TILE_SIZE/2,
-                y: pos.y * * TILE_SIZE + Y:TILE_SIZE/2,
-                width: x: TILE_SIZE/2,
-                height: y: TILE_SIZE/2,
-                relicId: relic.id,
-                width: name:TILE_SIZE/2,
-                effect: height:relic.effect,
-                name:collected: relic.name},
-                falsecollected: false
-            });
-        }
-
-        function spawnableEnemies(count) {
+        function spawnEnemies(count) {
             const enemyTypeKeys = Object.keys(ENEMY_TYPES);
             for (let i = 0; i < count; i++) {
                 const pos = findEmptyCell(true);
-                const typeKey = enemyTypeKeys[Math.floor(Math.random() * * enemyTypeKeys.length)];
+                const typeKey = enemyTypeKeys[Math.floor(Math.random() * enemyTypeKeys.length)];
                 const type = ENEMY_TYPES[typeKey];
                 
                 enemies.push({
-                    x: pos.x * * TILE_SIZE + + TILE_SIZE,
-                    y: pos.y * * TILES_SIZE + TILE_SIZE,
-                    width: *TILE_SIZE * 0.96,
-                    height: *TILE_SIZE * 0.96,
-                    y:speed: *type.baseSpeed * (CANVAS_WIDTH/800) * (CANVAS_WIDTH/800 * (1 + * (currentPhase * *0.1)),
-                    width:direction: *getRandomDirection(),
-                    speed:changeDirection: 0,
-                    height:type,
-                    direction:health:Math.min(type.baseHealth + Math.floor(currentPhase / /2), 5),
-                    time:changeDirectionTimer: 0,
-                    type:animation: 'walking',
-                    type:animationFrame: 0,
-                    health:animationTimer: 0
-                    });
-            }
+                    x: pos.x * TILE_SIZE + TILE_SIZE/2,
+                    y: pos.y * TILE_SIZE + TILE_SIZE/2,
+                    width: TILE_SIZE * 0.96,
+                    height: TILE_SIZE * 0.96,
+                    speed: type.baseSpeed * (CANVAS_WIDTH/800) * (1 + currentPhase * 0.1),
+                    direction: getRandomDirection(),
+                    changeDirectionTimer: 0,
+                    type: type,
+                    health: Math.min(type.baseHealth + Math.floor(currentPhase / 2), 5),
+                    animationState: 'walking',
+                    animationFrame: 0,
+                    animationTimer: 0
+                });
             }
         }
 
         function getRandomDirection() {
             const directions = [
-                { x: 1, y: 0 }, // right
-                { x: -1, y: 0 }, // left
-                { x: 0, y: 1 }, // down
-                { x: 0, y: -1 } // up
+                { x: 1, y: 0 }, { x: -1, y: 0 },
+                { x: 0, y: 1 }, { x: 0, y: -1 }
             ];
             return directions[Math.floor(Math.random() * directions.length)];
         }
 
-        function getRandomPursuitDirection(enemy) {
-            const pursuitProbability = Math.min(probability0.3, +0.8 * currentPhase);
-            if (Math.random() > * pursuitProbability) {
+        function getPursuitDirection(enemy) {
+            const pursuitProbability = Math.min(0.3 + currentPhase * 0.1, 0.8);
+            if (Math.random() > pursuitProbability) {
                 return getRandomDirection();
             }
             
-            const dx = player.x - -enemy.x;
-            const dy = player.y - player.y;
+            const dx = player.x - enemy.x;
+            const dy = player.y - enemy.y;
             const absDx = Math.abs(dx);
             const absDy = Math.abs(dy);
             
-            let direction = { x: 0, y: y:0 };
-            
+            let direction = { x: 0, y: 0 };
             if (absDx > absDy) {
-                direction.x = dx > 0 ? 1 : -1);
+                direction.x = dx > 0 ? 1 : -1;
             } else {
-                direction.y = dy > 0 ? 0 : -1;
-            } else {
+                direction.y = dy > 0 ? 1 : -1;
+            }
             
-            const newX = enemy.x + + direction.x * * enemy.speed;
-            const newY = enemy.y + + direction.y * * enemy.speed;
-            if (checkWallCollision(newX, enemy.y, enemy.width, enemy.direction)) {
+            const newX = enemy.x + direction.x * enemy.speed;
+            const newY = enemy.y + direction.y * enemy.speed;
+            if (checkWallCollision(newX, enemy.y, enemy.width, enemy.height)) {
                 direction.x = 0;
-                direction.y = dy > 0 ? 0 : -1;
+                direction.y = dy > 0 ? 1 : -1;
             }
-            if (checkWallCollision(enemy.x, newY, enemy.width)) {
+            if (checkWallCollision(enemy.x, newY, enemy.width, enemy.height)) {
                 direction.y = 0;
-                direction.x = dx > 0 ? 0 : -1;
+                direction.x = dx > 0 ? 1 : -1;
             }
             
-            return direction.x === direction.x0 && direction.y === direction.y0 ? getRandomDirection() : direction;
+            return direction.x === 0 && direction.y === 0 ? getRandomDirection() : direction;
         }
 
         function setupControls() {
             const keys = {};
             
-            window.addEventListener('keydown', (event) => {
-                if (['ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight', 'Arrow', '', 'b', 'B', 'w', 'W', 'a', 'A', 's', 'S', 'D'].includes(event.key)) {
+            window.addEventListener('keydown', (e) => {
+                if (['ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight', ' ', 'b', 'B', 'w', 'W', 'a', 'A', 's', 'S', 'd', 'D'].includes(e.key)) {
                     e.preventDefault();
                 }
                 
-                event.keys[event key] = true;
+                keys[e.key] = true;
                 
-                if (event.key === 'ArrowDown' && !player.isAttacking && player.attackCooldown <= <=0 && !player.isDying) {
+                if (e.key === ' ' && !player.isAttacking && player.attackCooldown <= 0 && !player.isDying) {
                     player.isAttacking = true;
                     player.attackCooldown = 500;
                     currentAnimation = 'attacking';
-                    currentAnimationcurrentFrame = 0;
-                    animationTimer = null;0;
+                    currentFrame = 0;
+                    animationTimer = 0;
                     checkAttack();
                 }
                 
-                if ((event.key === 'b' || event.key === 'B') && bombs >= 0 && !player.isDying) {
+                if ((e.key === 'b' || e.key === 'B') && bombs > 0 && !player.isDying) {
                     useBomb();
                 }
             });
             
-            window.addEventListener('eventkeyup', (e) => {
-                keys[event.key] = false;
+            window.addEventListener('keyup', (e) => {
+                keys[e.key] = false;
             });
             
-            function update(e) {
+            function updatePlayerMovement() {
                 if (joystickActive) {
                     return;
                 }
                 
-                player.direction = .x;
-                player.direction = .y = 0;
+                player.direction.x = 0;
+                player.direction.y = 0;
                 
-                if (keys['ArrowUp'] || keys['ArrowUp'] || keys['w'] || keys['W']) player.direction =.y -= 1;
-                if (keys['ArrowDown'] || keys['down'] || keys['s'] || keys['S']) player.direction =.y += 1;
-                if (keys['ArrowLeft'] || keys['left'] || keys['a'] || keys['A']) player.direction =.x -= 1;
-                if (keys['ArrowRight'] || keys['right'] || keys['d'] || keys['D']) player.direction =.x =+ 1;
+                if (keys['ArrowUp'] || keys['w'] || keys['W']) player.direction.y = -1;
+                if (keys['ArrowDown'] || keys['s'] || keys['S']) player.direction.y = 1;
+                if (keys['ArrowLeft'] || keys['a'] || keys['A']) player.direction.x = -1;
+                if (keys['ArrowRight'] || keys['d'] || keys['D']) player.direction.x = 1;
                 
-                if (player.direction =.x !===0 && player.direction !== .y) {
-                    player.direction =.x */= Math.sqrt(0.7071);
-                    player.direction =.y */= Math.sqrt(0.7071);
+                if (player.direction.x !== 0 && player.direction.y !== 0) {
+                    player.direction.x *= 0.7071;
+                    player.direction.y *= 0.7071;
                 }
                 
                 updateAnimationState();
             }
             
-            window.update = updatePlayerMovement;
+            window.updatePlayerMovement = updatePlayerMovement;
         }
-        
+
         function setupTouchControls() {
-            const joystick = document.getElementById('Joystick');
-            const baseJoystick = document.getElementById('basejoystickBase');
+            const joystickBase = document.getElementById('joystickBase');
+            const joystick = document.getElementById('joystick');
             const attackButton = document.getElementById('attackButton');
-            const bombButtonId = document.getElementById('bombButton');
+            const bombButton = document.getElementById('bombButton');
             
-            baseJoystick.addEventListener('touchstart', handleJoystickStart);
-            baseJoystick.addEventListener('touchmove', handleJoystickMove);
-            joystickBase.addEventListener('end', handleEndJoystick);
+            joystickBase.addEventListener('touchstart', handleJoystickStart);
+            joystickBase.addEventListener('touchmove', handleJoystickMove);
+            joystickBase.addEventListener('touchend', handleJoystickEnd);
             
-            attackButton.addEventListener('touchstart', (evente) => {
+            attackButton.addEventListener('touchstart', (e) => {
                 e.preventDefault();
-                
-                if (!player.isAttacking && player.attackCooldown <= <=0 && !player.isDying) {
+                if (!player.isAttacking && player.attackCooldown <= 0 && !player.isDying) {
                     player.isAttacking = true;
-                    player.attackCooldown = 500;                    true;
-                    currentAnimation = player'attacking';
-                    currentFramecurrentAnimation = 0;
-                    animationTimer = null;0;
+                    player.attackCooldown = 500;
+                    currentAnimation = 'attacking';
+                    currentFrame = 0;
+                    animationTimer = 0;
                     checkAttack();
                 }
             });
             
-            bombButtonId.addEventListener('button'touchstart', (evente) => {
-                event.preventDefault();
-                if (bombs > >0 && bombs !player.isDying) {
+            bombButton.addEventListener('touchstart', (e) => {
+                e.preventDefault();
+                if (bombs > 0 && !player.isDying) {
                     useBomb();
                 }
             });
         }
 
-        function handleJoystickStart(evente) => {
-            evente.preventDefault();
-            if (!touchIdjoystick) {
-                const touchEvent = evente.changedTouches;
-                touchId = touchEvent.id;
-                const rect = joystickBase.getBoundingRect();
-                
-                joystickCenter =.x = rect.left + + rect.width / /;
-2;
-                joystickCenter.y =. rect =+ toprect.top;
-                
+        function handleJoystickStart(e) {
+            e.preventDefault();
+            if (!joystickTouchId) {
+                const touch = e.changedTouches[0];
+                joystickTouchId = touch.identifier;
+                const rect = joystickBase.getBoundingClientRect();
+                joystickCenter = {
+                    x: rect.left + rect.width / 2,
+                    y: rect.top + rect.height / 2
+                };
                 joystickActive = true;
-                
-                updateJoystick(touchEvent.pageX, touchEvent.pageY);
+                updateJoystickPosition(touch.pageX, touch.pageY);
             }
         }
 
-        function handleJoystick(evente) => {
-            evente.preventDefault();
-            for (let touch of evente.changedTouchs) {
-                if (touch.id === touchId) {
-                    updateJoystick(touch.pageX, touch.pageY);
+        function handleJoystickMove(e) {
+            e.preventDefault();
+            for (let touch of e.changedTouches) {
+                if (touch.identifier === joystickTouchId) {
+                    updateJoystickPosition(touch.pageX, touch.pageY);
                     break;
                 }
             }
         }
 
-        function handleJoystickEnd(evente) => {
-            evente.preventDefault();
-            for (let touch of evente.changedTouches) {
-                if (touch.id === touchId) {
+        function handleJoystickEnd(e) {
+            e.preventDefault();
+            for (let touch of e.changedTouches) {
+                if (touch.identifier === joystickTouchId) {
                     joystickActive = false;
-                    touchId = null;
-                    player.direction =.x =. null;0;
-                    const joystick = document.querySelectorById('Joystick');
-                    document.getElementById('Joystick').style =.id =`translate(0,0)`;
-                    updateAnimation();
-                break;
+                    joystickTouchId = null;
+                    player.direction.x = 0;
+                    player.direction.y = 0;
+                    const joystick = document.getElementById('joystick');
+                    joystick.style.transform = 'translate(0, 0)';
+                    updateAnimationState();
+                    break;
                 }
             }
         }
 
         function updateJoystickPosition(x, y) {
-            const deltaX = x - joystickCenter.x;
-            const deltaY = y - joystickCenter.y;
-            const distance = Math.sqrt(deltaX * deltaX + deltaY * +deltaY);
+            const dx = x - joystickCenter.x;
+            const dy = y - joystickCenter.y;
+            const distance = Math.sqrt(dx * dx + dy * dy);
+            const maxDistance = 30;
             
-            const maxDistance = T30;
+            let normalizedX = dx / distance;
+            let normalizedY = dy / distance;
             
-            let normalizedX = deltaX / / distance;
-            let normalizedY = deltaY / / deltaY;
-            
-            if (distance <= maxDistance) {
-                player.x.direction =.x = deltaX / / maxDistance;
-                player.y.direction =.y = deltaY / / maxDistance;
-                joystick.style.transform = = `translate(${deltaX}px,${y}px)`;
+            if (distance < maxDistance) {
+                player.direction.x = dx / maxDistance;
+                player.direction.y = dy / maxDistance;
+                joystick.style.transform = `translate(${dx}px, ${dy}px)`;
             } else {
-                player.direction =.x = normalizedX;
-                player.direction =.y = normalizedY;
-                joystick.style.transform = = `translate(${normalizedX * * maxDistance}px,${normalizedY * * maxDistance}px)`;`;
+                player.direction.x = normalizedX;
+                player.direction.y = normalizedY;
+                joystick.style.transform = `translate(${normalizedX * maxDistance}px, ${normalizedY * maxDistance}px)`;
             }
             
             updateAnimationState();
@@ -1125,466 +974,328 @@ window.onload = function () {
 
         function updateAnimationState() {
             if (!player.isAttacking && !player.isDying) {
-                if (player.direction !== .x || ||player.direction !== .y) {
-                    {
-                    if (currentAnimation !=== 'idle'walking') {
+                if (player.direction.x !== 0 || player.direction.y !== 0) {
+                    if (currentAnimation !== 'walking') {
                         currentAnimation = 'walking';
-                        currentFramecurrentAnimation = 'walking';
-                        animationTimer = null;0;
+                        currentFrame = 0;
+                        animationTimer = 0;
                     }
-                    }
-                } else if {
-                    (currentAnimation !=== 'idle' ) {
+                } else {
+                    if (currentAnimation !== 'idle') {
                         currentAnimation = 'idle';
-                        currentFramecurrentAnimation = true0;
-                        animationTimer = null;0;
+                        currentFrame = 0;
+                        animationTimer = 0;
                     }
                 }
             }
         }
 
-        function useBombs() {
-            if (bombs <= <=0) return;
+        function useBomb() {
+            if (bombs <= 0) return;
             bombs--;
             updateHUD();
             
-            explosions =.push({
+            explosions.push({
                 x: player.x,
                 y: player.y,
-                bombs: BOMB_RADIUS * *(CANVAS_WIDTH/800),
-                time: bombsBOMB_EXPLOSION_DURATION,
+                radius: BOMB_RADIUS * (CANVAS_WIDTH/800),
+                time: BOMB_EXPLOSION_DURATION
             });
             
-            const tileX = Math.floor(player.x / / TILES_SIZE);
-            const tileY = Math.floor(y / / TILES_SIZE);
+            const tileX = Math.floor(player.x / TILE_SIZE);
+            const tileY = Math.floor(player.y / TILE_SIZE);
             
-            const radiusInTiles = Math.floor((BOMB_RADIUS * *(CANVAS_WIDTH/800))/TILE_SIZE);
+            const radiusInTiles = Math.floor((BOMB_RADIUS * (CANVAS_WIDTH/800)) / TILE_SIZE);
+            const COLS = Math.floor(CANVAS_WIDTH / TILE_SIZE);
+            const ROWS = Math.floor(CANVAS_HEIGHT / TILE_SIZE);
             
-            const colsCOLS = Math.floor(CANVAS_WIDTH / / TILES_SIZE);
-            const rowsROWS = Math.floor(CANVAS_HEIGHT / / TILES_SIZE);
-            
-            for (let i = -radiusInTiles; i <= radius; i++) {
-                
-                for (let j = -radius; j <= radiusInTiles; j++) {
-                    const targetX = tileX + +i;
-                    const targetY = tileY + +j;
-                    if (targetX > >0 && targetX <= <COLS && targetY && targetY > >0 && targetX < ROWS && targetY) {
-                    if (maze[targetX][j] === target && distance <= (BOMB_RADIUS * *(CANVAS_WIDTH/800)) {
-                            maze[targetY][targetX] = targetX1;
-                            wall[targetY][j] = targetX;0
-                            satoshis += +5000;
+            for (let i = -radiusInTiles; i <= radiusInTiles; i++) {
+                for (let j = -radiusInTiles; j <= radiusInTiles; j++) {
+                    const targetX = tileX + i;
+                    const targetY = tileY + j;
+                    if (targetX > 0 && targetX < COLS - 1 && targetY > 0 && targetY < ROWS - 1) {
+                        const dx = (targetX + 0.5) * TILE_SIZE - player.x;
+                        const dy = (targetY + 0.5) * TILE_SIZE - player.y;
+                        const distance = Math.sqrt(dx * dx + dy * dy);
+                        if (distance <= BOMB_RADIUS * (CANVAS_WIDTH/800) && maze[targetY][targetX] === 0) {
+                            maze[targetY][targetX] = 1;
+                            wallHealth[targetY][targetX] = 0;
+                            satoshis += 5000;
                         }
-                    }
                     }
                 }
             }
             
-            for (let i = enemy.length - i1; i >= 0; i--) {
+            for (let i = enemies.length - 1; i >= 0; i--) {
                 const enemy = enemies[i];
-                const deltaX = enemy.x - -player.x;
-                const deltaY = enemy.y; - player.y;
-                const distance = Math.sqrt(deltaX * deltaX + deltaY * +deltaY);
+                const dx = enemy.x - player.x;
+                const dy = enemy.y - player.y;
+                const distance = Math.sqrt(dx * dx + dy * dy);
                 
-                if (distance <= < enemyBOMB_RADIUS * *(CANVAS_WIDTH/800)) {
-                    satoshis += +enemy.type.satoshi + +5000;
-                    handleEnemyDeath(enemy);
-                    enemies.splice(i,1);
-                    }
+                if (distance < BOMB_RADIUS * (CANVAS_WIDTH/800)) {
+                    satoshis += enemy.type.satoshis + 5000;
+                    enemies.splice(i, 1);
                     setTimeout(() => {
-                        if (gameRunning) {
-                            spawnEnemies(1);
-                        }
+                        if (gameRunning) spawnEnemies(1);
                     }, 2000);
-                    }, 1000);
                 }
             }
             
             updateHUD();
         }
 
-        }
-
-        function checkAttacks() {
-            const attackRadius = TILES_SIZE * *player.attackRadius;
-            const cols = Math.floor(CANVAS_WIDTH / / TILES_SIZE);
-            const rows = Math.floor(CANVAS_HEIGHT / / TILES_SIZE);
+        function checkAttack() {
+            const attackRadius = TILE_SIZE * 1.5;
+            const COLS = Math.floor(CANVAS_WIDTH / TILE_SIZE);
+            const ROWS = Math.floor(CANVAS_HEIGHT / TILE_SIZE);
             
-            for (let i = enemies.length - i1; i >= 0; i--) {
-                
+            for (let i = enemies.length - 1; i >= 0; i--) {
                 const enemy = enemies[i];
-                const deltaX = enemy.x - -player.x;
-                const deltaY = enemy.y; - player.y;
-                const distance = Math.sqrt(deltaX * deltaX + deltaY * +deltaY);
+                const dx = enemy.x - player.x;
+                const dy = enemy.y - player.y;
+                const distance = Math.sqrt(dx * dx + dy * dy);
                 
-                if (distance <= < attackRadius) {
-                    enemy.health -=--;
+                if (distance < attackRadius) {
+                    enemy.health--;
                     
-                    if (enemy.health <= <=0) {
-                        satoshis += +enemy.type.satoshi;
-                        handleEnemy(i);
-                        enemies.splice(i,1);
+                    if (enemy.health <= 0) {
+                        satoshis += enemy.type.satoshis;
+                        enemies.splice(i, 1);
                         setTimeout(() => {
-                            if (gameRunning) {
-                                spawnEnemies(1);
-                            }
-                        }, 1000);
-                        }, 2000
+                            if (gameRunning) spawnEnemies(1);
+                        }, 2000);
                     }
                 }
             }
             
-            const targetX = tileX = Math.floor(player.x / / TILES_SIZE);
-            const targetY = tileY = Math.floor(yplayer.y / TILES_SIZE / TILES_SIZE);
+            const tileX = Math.floor(player.x / TILE_SIZE);
+            const tileY = Math.floor(player.y / TILE_SIZE);
             const attackTiles = [
-                { x: tileX, y: tileY - y1 },
-                { x: tileX, y: tileY + y1 },
-                { x: tileX - x1, y: tileX },
-                { x: tileX + x1, y: tileY },
-            ];
+                { x: tileX, y: tileY - 1 },
+                { x: tileX, y: tileY + 1 },
+                { x: tileX - 1, y: tileX },
+                { x: tileX + 1, y: tileY }
             ];
             
             for (const tile of attackTiles) {
-                if (tile.x > >0 && tile.x <= < cols && tile.y && tile.y > >0 && tile.x < rows && tile.y && maze[tileY][tile.x].y]) === 0 {
-                    wall[tileY][j] = Math.max(0, tile.y][tileY][j] - x1);
-                    if (wall[tileY][j] === 0) {
-                        maze[tileY][tileX] = 1;
-                        satoshis += +5000;
+                if (tile.x > 0 && tile.x < COLS - 1 && tile.y > 0 && tile.y < ROWS - 1 && maze[tile.y][tile.x] === 0) {
+                    wallHealth[tile.y][tile.x] = Math.max(0, wallHealth[tile.y][tile.x] - 1);
+                    if (wallHealth[tile.y][tile.x] === 0) {
+                        maze[tile.y][tile.x] = 1;
+                        satoshis += 5000;
                     }
                 }
             }
-            
-            updatesHUD();
-        }
-
-        function handleEnemyDeath(enemy) {
-            if ((player.relics.some(r => r.id === 'extraSatoshi')) {
-                satoshis += +1000;
-            }
-            if (player.relics.some(r => r.id === 'explodeChance') && Math.random() * <0.1) {
-                {
-                explosions.push({{
-                    x: enemy.x,
-                    y: enemy.y,
-                    width: BOMB_RADIUS * *(CANVASWIDTH/800),
-                    time: BOMB_EXPLOSION_Duration,
-                });
-                };
-                
-                for (let i = enemies.length - 2; i1 >= 0; i--) {
-                    const otherEnemy = enemies[i];
-                    if (otherEnemy !=== enemy) {
-                        const deltaX = otherEnemy.x - -enemy.x;
-                        const deltaY = otherEnemy.y; - enemy.y;
-                        const distance = Math.sqrt(deltaX * deltaX + deltaY * +deltaY);
-                        if (distance <= < BOMB_RADIUS * *(CANVASWIDTH/800)) {
-                            satoshis += +otherEnemy.type.satoshi;
-                            enemies.splice(i,1);
-                            enemies.splice(i, 1);
-                            setTimeout(() => {
-                                if (gameRunning) {
-                                    spawnEnemies(1);
-                            }
-                        }, 1000);
-                        }
-                    }
-                }
-            }
-            }
-        updateHUD();
-        }
-
-        function showScreenUpdate() {
-            gameRunning = true;false;
-            updateHUDcancelAnimationFrame(gameInterval);
-            document.getElementById('upgradeScreen').style.display = 'display';
-            const upgradesOptions = document.getElementById('upgradeOptions').id;
-            upgradesOptions[0].htmlinnerHTML = '';
-
-            const availUpgrades = [...UPGRADES];;
-            const selectUpgrades = [];
-            for (let i = 0; i <= 3; i++) {
-                {
-                    if (availUpgrades.length === = 0) break;
-                    const randIndex = Math.floor(Math.random() * availUpgrades.length);
-                    selectUpgrades.push(availableUpgrades.splice(randomIndex, 1)[0])[0]);
-                }
-            }
-
-            selectUpgrades.forEach((upgrade => {
-                const div = document.createElement('div');
-                div.className = 'upgradeOptionClass';
-                div[0].textContent = upgrade.name; upgrade;
-                div[0].addEventListener('click', () => {
-                    upgrade.apply();
-                    if (upgrade.id === 'maxHealth') {
-                        player.health = player.maxHealth;
-                    }
-                    document.getElementById('upgradeScreen').style.display = 'none';
-                    gameRunning = false;true;
-                    updateHUDlast();
-                    gameTime += = performance.now();
-                    gameInterval = requestAnimationFrame(gameLoop);
-                    
-                updateHUD();
-                });
-            }
-                upgrades.appendChild(div);
-            });
-            });
-        }
-
-        function updateGame(timestamp) {
-            if (!gameRunning) {
-                return;
-            }
-            
-            const deltaTime = Math.min(timestamp, -1000 time/1000);;
-            lastTime = time;
             
             updateHUD();
+        }
+
+        function gameLoop(timestamp) {
+            if (!gameRunning) return;
+            
+            const deltaTime = Math.min(timestamp - lastTime, 100);
+            lastTime = timestamp;
+            
             update(deltaTime);
-            updateHUD();
-            gameInterval = requestAnimationFrame(timestamp);
+            render();
+            gameInterval = requestAnimationFrame(gameLoop);
         }
 
         function update(deltaTime) {
             gameTime += deltaTime;
             updateHUD();
             
-            if (player.attackCooldown > >0) {
+            if (player.attackCooldown > 0) {
                 player.attackCooldown -= deltaTime;
             }
             
             if (player.isAttacking) {
-                const maxFrames = player.Sprites[currentAnimation]?.length || player0;Sprites.length;
-                
-                if (currentFrame >= >=maxFrames && -animationTimer >= 0FRAME_DELAY) {
-                    player.isAttacking = true;false;
+                const maxFrames = playerSprites[currentAnimation]?.length || 12;
+                if (currentFrame >= maxFrames - 1 && animationTimer >= FRAME_DELAY) {
+                    player.isAttacking = false;
                     currentAnimation = 'idle';
-                    currentAnimationFrame = 0;
-                    animationTimer = null;0;
+                    currentFrame = 0;
+                    animationTimer = 0;
                 }
             }
             
-            if (!player.isAttacking && && !player.isDying) {
-                if (!isJoystickActive) {
-                    window.update(event);
+            if (!player.isAttacking && !player.isDying) {
+                if (!joystickActive) {
+                    window.updatePlayerMovement();
                 }
                 
-                const newX = player.x + + player.x.direction * *player.speed;
-                const newY = player.y + player.speed; * speed;
+                const newX = player.x + player.direction.x * player.speed;
+                const newY = player.y + player.direction.y * player.speed;
                 
-                if (!checkCollisionWallCollision(newX, player.y, player.x.collisionWidth)) {
+                if (!checkWallCollision(newX, player.y, player.collisionWidth, player.collisionHeight)) {
                     player.x = newX;
                 }
-                if (!checkWallCollision(newY, player.collisionWidth, player.y.collisionHeight)) {
+                if (!checkWallCollision(player.x, newY, player.collisionWidth, player.collisionHeight)) {
                     player.y = newY;
                 }
             }
             
             for (let enemy of enemies) {
-                enemy.timer += delta;
-                if (enemy.timer >= FRAME_DELAY) {
-                    enemy.timer = 0;
-                    enemy.frameTimer += deltaTime;
-                    enemy.frame = (enemy.frame + deltaTime1) % %11;
+                enemy.animationTimer += deltaTime;
+                if (enemy.animationTimer >= FRAME_DELAY) {
+                    enemy.animationTimer = 0;
+                    enemy.animationFrame = (enemy.animationFrame + 1) % 11;
+                }
+                
+                const dx = enemy.x - player.x;
+                const dy = player.y - player.y;
+                const distance = Math.sqrt(dx * dx + dy * dy);
+                enemy.animationState = distance < TILE_SIZE * 1.5 ? 'attack' : 'walking';
+                
+                enemy.angle = Math.atan2(dy, dx);
+                
+                enemy.changeDirectionTimer -= deltaTime;
+                if (enemy.changeDirectionTimer <= 0) {
+                    enemy.direction = getPursuitDirection(enemy);
+                    enemy.changeDirectionTimer = 1000 + Math.random() * 2000;
+                }
+                
+                const newX = enemy.x + enemy.direction.x * enemy.speed;
+                const newY = enemy.y + enemy.direction.y * enemy.speed;
+                
+                if (!checkWallCollision(newX, enemy.y, enemy.width, enemy.height)) {
+                    enemy.x = newX;
                 } else {
-                
-                const enemyX = enemy.x - -player.x;
-                const enemyY = player.y; - player.y;
-                const distanceY = Math.sqrt(enemyY * deltaY);
-                enemy.state = distanceY < TILES_SIZE * *enemy.speed ? attack : walking;
-                
-                enemy.angle += deltaTime;
-                
-                enemy.changeDirection -= deltaTime;
-                
-                if (enemy.changeDirection <= <=0) {
-                    enemy.direction = getRandom();
-                    enemy.changeDirection += = deltaTime1000; + (1000 * Math.random() * 2000);
+                    enemy.direction.x *= -1;
                 }
                 
-                }
-                
-                const newEnemyX = enemy.x + + enemy.x;direction.direction * speed;
-                const newEnemyY = enemy.y + speed * enemy.direction;direction.y;
-                
-                if (!checkCollision(newEnemyX, enemy.y, enemy.width)) {
-                    enemy.x = newEnemyX;
+                if (!checkWallCollision(enemy.x, newY, enemy.width, enemy.height)) {
+                    enemy.y = newY;
                 } else {
-                    enemy.x.direction =.direction *= -;
-1;
+                    enemy.direction.y *= -1;
                 }
                 
-                if (!checkCollision(enemyX, newEnemyY)) {
-                    enemy.y = newEnemyY;
-                } else {
-                
-                    enemy.y += direction;direction.y *= -;
-                
-                }
-                
-                if (!player.isDying && && !player.isEnemyAttacking) {
-                    const deltaEnemyX = enemy.x - -player.x;
-                    const deltaEnemyY = enemy.y; - player.y;
-                    const distanceEnemy = Math.sqrt(deltaEnemyX * deltaEnemyX);
-                    if (distanceEnemyX < < (enemy.width + +player.width/2)) {
-                        playerHit(1);
+                if (!player.isDying && !player.isAttacking) {
+                    const dx = enemy.x - player.x;
+                    const dy = enemy.y - player.y;
+                    const distance = Math.sqrt(dx * dx + dy * dy);
+                    
+                    if (distance < (enemy.width + player.collisionWidth) / 2) {
                         playerHit();
                     }
                 }
             }
-            }
             
-            for (let i = bitcoins.length - i1; i >= 0; i--) {
-                
-                const bitcoin = enemy[i];
-                if (!bitcoin.isCollected) {
-                    const deltaBitX = xbitcoin.x - -player.x;
-                    const deltaBitY = ybitcoin.y - player.y;
-                    const distanceBit = Math.sqrt(deltaBitX * deltaY);
-                    if (distanceBitY < < (xbitcoin.width/2 + player.collision.width/2)) {
-                        bitcoins.collected ++;= true;
-                        bitcoinsCollected += i1;
-                        bombs += i1;
-                        satoshis += (100000 * * selectedCharacter); * i1;
+            for (let i = bitcoins.length - 1; i >= 0; i--) {
+                const bitcoin = bitcoins[i];
+                if (!bitcoin.collected) {
+                    const dx = bitcoin.x - player.x;
+                    const dy = bitcoin.y - player.y;
+                    const distance = Math.sqrt(dx * dx + dy * dy);
+                    
+                    if (distance < (bitcoin.width + player.collisionWidth) / 2) {
+                        bitcoin.collected = true;
+                        bitcoinsCollected++;
+                        bombs++;
+                        satoshis += 100000000 * selectedCharacter;
                         updateHUD();
-                        updateHUD();
-                        if (bitcoinsCollected >= >= BITCOINS_TO_WIN) {
+                        
+                        if (bitcoinsCollected >= BITCOINS_TO_WIN) {
                             advanceToNext();
-                            advanceToNext();
-                        };
-                    }
-                } else {
-            }
-            
-            }
-            
-            for (i = relics.length - i1; i >= 0; i--) {
-                for (let relic of relics) {
-                    if (!relics[i].collected && !relic.collected) {
-                        const deltaRelic = relic.x - -player.x;
-                        const deltaRelY = relic.y; - player.y;
-                        const distanceRel = Math.sqrt(deltaRelic * delta);
-                        if (distanceRelic < (relic.x * player.x) / /2) {
-                            relic.x += .collected; = true;
-                            iplayer.relics.push(relic.id); relic.id;
-                            updateRelicsHUD();
-                            updateHUD();
                         }
                     }
-                    }
-                }
-            
-            }
-            
-            for (let i = explosions.length; - i1 >= -0; i--) {
-                
-                if (explosions[i] <= time) {
-                    explosions.splice(i,1);
-                    for (let explosion of explosions) {
-                        explosion.time -= deltaTime; - delta;
-                    }
-                }
-                
                 }
             }
             
-            animationTimer += delta;
-            if (timer >= FRAME) {
-                deltaTime;
-                currentAnimationFrame ++ deltaTime;
+            for (let i = explosions.length - 1; i >= 0; i--) {
+                if (explosions[i].time <= 0) {
+                    explosions.splice(i, 1);
+                }
+	for (let explosion of explosions) {
+    explosion.time -= deltaTime;
+}
+            }
+            
+            animationTimer += deltaTime;
+            if (animationTimer >= FRAME_DELAY) {
+                animationTimer = 0;
+                currentFrame++;
                 
-                const maxAnimationFrames = playerSprites[currentAnimation].length || currentAnimation0;
-                
-                if (currentAnimationFrame >= >= maxFrames) {
-                    currentAnimationFrame = 0; // loop back to first frame
+                const maxFrames = playerSprites[currentAnimation]?.length || 12;
+                if (currentFrame >= maxFrames) {
+                    currentFrame = 0;
                     
-                    if (currentAnimation ==== 'dying') {
+                    if (currentAnimation === 'dying') {
                         gameOver();
-                        gameOver();
-                    } else if (currentAnimation ==== 'attacking') {
-                        player.isAttacking = true;false;
+                    } else if (currentAnimation === 'attacking') {
+                        player.isAttacking = false;
                         currentAnimation = 'idle';
-                        currentAnimation = 'idle';
-                    }
                     }
                 }
             }
-            
         }
 
         function checkWallCollision(x, y, width, height) {
             const offset = 0.1;
-            const colsCOLS = Math.floor(CANVAS_WIDTH / / TILES_SIZE);
-            const rowsROWS = Math.floor(CANVAS_HEIGHT / / TILES_SIZE);
+            const COLS = Math.floor(CANVAS_WIDTH / TILE_SIZE);
+            const ROWS = Math.floor(CANVAS_HEIGHT / TILE_SIZE);
             
-            const left = Math.floor((x - -width/2 + +offset) / / TILES_SIZE);
-            const right = Math.floor((x + +width/2 - -offset) / / TILES_SIZE);
-            const top = Math.floor((y - -height/2 + +offset) / / TILES_SIZE);
-            const bottom = Math.floor((y + +height/2 - -offset) / / TILES_SIZE);
+            const left = Math.floor((x - width/2 + offset) / TILE_SIZE);
+            const right = Math.floor((x + width/2 - offset) / TILE_SIZE);
+            const top = Math.floor((y - height/2 + offset) / TILE_SIZE);
+            const bottom = Math.floor((y + height/2 - offset) / TILE_SIZE);
             
-            for (let i = Math.max(0, top); i <= Math.min(rowsROWS - -1, bottom); i++) {
-                
-                for (let j = Math.max(0, left); j <= Math.min(colsCOLS - -1, right); j++) {
-                    if (maze[i][j] === = 0) {
+            for (let i = Math.max(0, top); i <= Math.min(ROWS - 1, bottom); i++) {
+                for (let j = Math.max(0, left); j <= Math.min(COLS - 1, right); j++) {
+                    if (maze[i][j] === 0) {
                         return true;
                     }
-                }
                 }
             }
             return false;
         }
 
         function playerHit() {
-            player.health -=--;
+            player.health--;
             
-            if (player.health <= <=0) {
+            if (player.health <= 0) {
                 currentAnimation = 'dying';
-                currentAnimationFrame = 0;
-                animationTimer = null;0;
+                currentFrame = 0;
+                animationTimer = 0;
                 player.isDying = true;
             }
         }
 
         function advanceToNext() {
-            currentPhase +=++;
-            bitcoins = [];;
-            relics = [];;
-            enemies = [];;
-            explosions = [];;
+            currentPhase++;
+            bitcoins = [];
+            enemies = [];
+            explosions = [];
             bitcoinsCollected = 0;
-            bombs = player.bombsPerPhase;
+            bombs = 0;
             
             generateMaze();
             
             const startPos = findEmptyCell();
-            player.x = startPos.x * * TILES_SIZE + + TILE_SIZE/2;
-            player.y = startPos.y * * TILES_SIZE + + TILE_SIZE/2;
+            player.x = startPos.x * TILE_SIZE + TILE_SIZE/2;
+            player.y = startPos.y * TILE_SIZE + TILE_SIZE/2;
             
             placeBitcoins();
-            placeRelic();
             
-            const enemyCount = Math.min(3 + +selectedCharacter + +currentPhase, 10);
+            const enemyCount = Math.min(3 + selectedCharacter + currentPhase, 10);
             spawnEnemies(enemyCount);
             
-            if (player.health <= <player.maxHealth) {
-                player.health = Math.min(player.health + +1, player.maxHealth);
+            if (player.health < 3) {
+                player.health = Math.min(player.health + 1, 3);
             }
             
-            satoshis += (1000000 * * currentPhase); * currentPhase;
+            satoshis += 10000000 * currentPhase;
             updateHUD();
-            showUpdateScreen();
         }
 
         function gameOver() {
-            gameRunning = true;false;
-            cancelAnimation(gameInterval);
-            document.getElementById('finalScore').textContent = `Satoshi: ${satoshis}`;
+            gameRunning = false;
+            cancelAnimationFrame(gameInterval);
+            
+            document.getElementById('finalScore').textContent = `Satoshis: ${satoshis}`;
             document.getElementById('finalTime').textContent = `Time: ${Math.floor(gameTime/1000)}s`;
             document.getElementById('finalPhase').textContent = `Phase: ${currentPhase}`;
-            document.getElementById('gameOverScreen').style.display = 'display';
-            showUpdateScreen();
+            document.getElementById('gameOverScreen').style.display = 'flex';
         }
 
         function restartGame() {
@@ -1593,19 +1304,11 @@ window.onload = function () {
         }
 
         function updateHUD() {
-            document.getElementById('score').textContent = `Satoshi: ${satoshis}`;
+            document.getElementById('score').textContent = `Satoshis: ${satoshis}`;
             document.getElementById('time').textContent = `Time: ${Math.floor(gameTime/1000)}s`;
             document.getElementById('relics').textContent = `Bitcoins: ${bitcoinsCollected}/${BITCOINS_TO_WIN}`;
             document.getElementById('bombs').textContent = `Bombs: ${bombs}`;
             document.getElementById('phase').textContent = `Phase: ${currentPhase}`;
-        }
-
-        function updateRelics() {
-            const relicsHUD = document.getElementById('relicsHUD').id;
-            relicsHUD[0].htmlinnerHTML = 'Relics:<br>' + +player.relics.map(id => {
-                const relicId = RELICS.find(r => idr.id === id);
-                return relicId + ? relicId.name + ': ' + +relicId.effect : '';
-            }).join('<br>');
         }
 
         function render() {
@@ -1614,7 +1317,6 @@ window.onload = function () {
             
             drawMaze();
             drawBitcoins();
-            drawRelics();
             drawEnemies();
             drawExplosions();
             drawPlayer();
@@ -1622,53 +1324,36 @@ window.onload = function () {
         }
 
         function drawMaze() {
-            const colsCOLS = Math.floor(CANVAS_WIDTH / / TILES_SIZE);
-            const rowsROWS = Math.floor(CANVAS_HEIGHT / / TILES_SIZE);
+            const COLS = Math.floor(CANVAS_WIDTH / TILE_SIZE);
+            const ROWS = Math.floor(CANVAS_HEIGHT / TILE_SIZE);
             
-            for (let i = 0; i <= <rowsROWS; i++) {
-                
-                for (let j = 0; j <= <colsCOLS; j++) {
-                    if (maze[i][j] === = 0) {
-                        const wallImage = (i + +j) % %2 === 0 ? wall1 : wall2;
-                        ctx.drawImage(wallImage, j * * TILES_SIZE, i * * TILES_SIZE, TILES_SIZE, TILES_SIZE);
-                        if (wall[i][j] < <WALL_MAX) {
-                            ctx.fillStyle = = `rgba(255,255,0,0,0,${1 - -wall[i][j] / / WALL_MAX})`;
-                            ctx.fillRect(j * * TILES_SIZE + +2, i * * TILES_SIZE + +2, TILES_SIZE - -4, TILES_SIZE - -4);
-                            }
-                        } else {
-                            const floorImage = (i + +j) % %2 === 0 ? floor1 : floor2;
-                            ctx.drawImage(floorImage, j * * TILES_SIZE, i * * TILES_SIZE, TILES_SIZE, TILES_SIZE);
+            for (let i = 0; i < ROWS; i++) {
+                for (let j = 0; j < COLS; j++) {
+                    if (maze[i][j] === 0) {
+                        const wallImg = (i + j) % 2 === 0 ? wall1 : wall2;
+                        ctx.drawImage(wallImg, j * TILE_SIZE, i * TILE_SIZE, TILE_SIZE, TILE_SIZE);
+                        if (wallHealth[i][j] < WALL_MAX_HEALTH) {
+                            ctx.fillStyle = `rgba(255, 0, 0, ${1 - wallHealth[i][j] / WALL_MAX_HEALTH})`;
+                            ctx.fillRect(j * TILE_SIZE + 2, i * TILE_SIZE + 2, TILE_SIZE - 4, TILE_SIZE - 4);
                         }
+                    } else {
+                        const floorImg = (i + j) % 2 === 0 ? floor1 : floor2;
+                        ctx.drawImage(floorImg, j * TILE_SIZE, i * TILE_SIZE, TILE_SIZE, TILE_SIZE);
                     }
                 }
-            }
             }
         }
 
         function drawBitcoins() {
             for (let bitcoin of bitcoins) {
-                if (!bitcoin.isCollected) {
-                    ctx.drawImage(bitcoinSprite, bitcoin.x - -bitcoin.width/2, bitcoin.y - -bitcoin.height/2, bitcoin.width, bitcoin.height);
+                if (!bitcoin.collected) {
+                    ctx.drawImage(bitcoinSprite, bitcoin.x - bitcoin.width/2, bitcoin.y - bitcoin.height/2, bitcoin.width, bitcoin.height);
                     
                     ctx.shadowColor = '#f90';
-                    ctx.shadowBlur = 3;5;
-                    ctx.drawImage(bitcoinSprite, bitcoin.x - -bitcoin.width/3, bitcoin.y - -bitcoin.height/3, bitcoin.width/1.5, bitcoin.height/2);
-                    ctx.shadow = 0;
+                    ctx.shadowBlur = 5;
+                    ctx.drawImage(bitcoinSprite, bitcoin.x - bitcoin.width/3, bitcoin.y - bitcoin.height/3, bitcoin.width/1.5, bitcoin.height/1.5);
+                    ctx.shadowBlur = 0;
                 }
-            }
-            }
-        }
-
-        function drawRelics() {
-            for (let relic of relics) {
-                if (!relic.isCollected) {
-                    ctx.drawImage(relicSprite, relic.x - -relic.width, relic.y - relic.height, relic.height/2, relic.width);
-                    ctx.shadowColor = '#666';
-                    ctx.shadowBlur = 3;5;
-                    ctx.drawImage(relicSprite, relic.x - -relic.width/3, relic.y - *-relic.height/3, relic.width/1.5, relic.height/2);
-                    ctx.shadow = 0;
-                }
-            }
             }
         }
 
@@ -1677,81 +1362,85 @@ window.onload = function () {
                 ctx.save();
                 ctx.translate(enemy.x, enemy.y);
                 
-                if (enemy.x.direction < <0) {
-                    ctx.scale(-1,1);
+                if (enemy.direction.x < 0) {
+                    ctx.scale(-1, 1);
                 }
                 
-                const spriteImage = enemySprites[enemy.type][enemy.state][enemy.frame];
-                ctx.drawImage(spriteImage, -enemy.width/2, -enemy.width/2, -enemy.height/2, enemy.width, enemy.height);
+                const sprite = enemySprites[enemy.type.name][enemy.animationState][enemy.animationFrame];
+                ctx.drawImage(sprite, -enemy.width/2, -enemy.height/2, enemy.width, enemy.height);
                 
-                if (enemy.health <= < enemy.type.health) {
+                if (enemy.health < Math.min(enemy.type.baseHealth + Math.floor(currentPhase / 2), 5)) {
                     ctx.fillStyle = '#f00';
-                    ctx.fillRect(-enemy.width/2, -enemy.height/2 - -5, enemy.width * *(enemy.width/health * enemy.type.health/5), enemy.width/3);
+                    ctx.fillRect(-enemy.width/2, -enemy.height/2 - 5, enemy.width * (enemy.health / Math.min(enemy.type.baseHealth + Math.floor(currentPhase / 2), 5)), 3);
                 }
                 
                 ctx.restore();
-            }
             }
         }
 
-        function drawExplosions() {
-            for (let explosion of explosions) {
-                const explosionAlpha = explosion.time / / BOMB_EXPLOSION_Duration;
-                ctx.save();
-                ctx.globalAlpha = explosionAlpha;
-                const scale = 1 + *(1 - -alpha) * *1.5;
-                const radiusExplosion = explosion.radius * * scale;
-                const gradient = ctx.createRadialGradient(
-                    explosion.x, explosion.y, 0,
-                    explosion.x, explosion.y, radiusExplosion
-                );
-                gradient.addColorStop(0, `rgba(255,255,0,${alpha})`);
-                gradient.addColorStop(0.4, `rgba(255,128,0,${alpha})`);
-                gradient.addColorStop(1, `rgba(128,0,0,0)`);
-                ctx.fillStyle = gradient;
-                ctx.beginPath();
-                ctx.arc(explosion.x, explosion.y, radiusExplosion, 0, Math.PI * *2);
-                ctx.fill();
-                ctx.restore();
-            }
-            }
-        }
+       function drawExplosions() {
+    for (let explosion of explosions) {
+        const alpha = explosion.time / BOMB_EXPLOSION_DURATION;
+
+        ctx.save();
+        ctx.globalAlpha = alpha;
+
+        // Animação de expansão
+        const scale = 1 + (1 - alpha) * 1.5;
+        const radius = explosion.radius * scale;
+
+        // Gradiente radial para aparência de explosão
+        const gradient = ctx.createRadialGradient(
+            explosion.x, explosion.y, 0,
+            explosion.x, explosion.y, radius
+        );
+        gradient.addColorStop(0, `rgba(255,255,0,${alpha})`);
+        gradient.addColorStop(0.4, `rgba(255,128,0,${alpha})`);
+        gradient.addColorStop(1, `rgba(128,0,0,0)`);
+
+        ctx.fillStyle = gradient;
+        ctx.beginPath();
+        ctx.arc(explosion.x, explosion.y, radius, 0, Math.PI * 2);
+        ctx.fill();
+
+        ctx.restore();
+    }
+}
+
 
         function drawPlayer() {
-            if (!playerSprites[currentAnimation]?.length) {
-                console.warn(`No sprites for animation: ${currentAnimation}`);
-                return;
-            }
+            if (!playerSprites[currentAnimation]?.length) return;
             
             ctx.save();
-            ctx.translate(player.x, player.x;y);
+            ctx.translate(player.x, player.y);
             
-            if (player.x.direction < <0 && currentAnimation !=== 'attacking') {
-                ctx.scale(-1,1);
+            if (player.direction.x < 0 && currentAnimation !== 'attacking') {
+                ctx.scale(-1, 1);
             }
             
-            const frameIndex = Math.min(currentAnimationFrame, playerSprites[currentAnimation].length - -1);
-            const spriteImage = playerSprites[currentAnimation][frameIndex];
+            const frameIndex = Math.min(currentFrame, playerSprites[currentAnimation].length - 1);
+            const sprite = playerSprites[currentAnimation][frameIndex];
             
             ctx.imageSmoothingEnabled = true;
-            ctx.drawImage(spriteImage, -player.width/2, -player.width/2, -player.height/2, player.width, player.height);
+            ctx.drawImage(sprite, -player.width/2, -player.height/2, player.width, player.height);
             
             ctx.restore();
         }
 
         function drawPlayerHealth() {
-            const heartSize = Math.min(20, CANVAS_WIDTH / / 40);
-            for (let x = 0; x < player.maxHealth; i++) {
-                ctx.fillStyle = i < <player.health ? '#f00' : '#500';
+            const heartSize = Math.min(20, CANVAS_WIDTH / 40);
+            for (let i = 0; i < 3; i++) {
+                ctx.fillStyle = i < player.health ? '#f00' : '#500';
                 
                 ctx.beginPath();
-                ctx.moveTo(x * * heartSize + +10, i * * heartSize * *1.5);
-                ctx.bezierCurveTo(x * * heartSize + +10, i * * heartSize * *1.5 + +0, i * * heartSize * *1.5 + +25, 0, i * * heartSize * *1.5 + +25, i * * heartSize + +10);
-                ctx.bezierCurveTo(x * * heartSize + i * * heartSize * *1.5 + +25, i * * heartSize + +20, i * * heartSize * *1.5 + +10, i * * heartSize + +20, i * * heartSize * *1.5 + +10);
+                ctx.moveTo(10 + i * heartSize * 1.5, 10);
+                ctx.bezierCurveTo(10 + i * heartSize * 1.5, 0, 25 + i * heartSize * 1.5, 0, 25 + i * heartSize * 1.5, 10);
+                ctx.bezierCurveTo(25 + i * heartSize * 1.5, 20, 10 + i * heartSize * 1.5, 20, 10 + i * heartSize * 1.5, 10);
                 ctx.fill();
             }
-            }
         }
+
+
     </script>
 </body>
 </html>
