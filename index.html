@@ -379,22 +379,22 @@
 
         // Initialize game
         function setupGameInitialization() {
-            window.onload = function () {
-                canvas = document.getElementById('gameCanvas');
-                ctx = canvas.getContext('2d');
-                ctx.imageSmoothingEnabled = true;
-                
-                resizeCanvas();
-                window.addEventListener('resize', resizeCanvas);
-                document.addEventListener('fullscreenchange', resizeCanvas);
-                setupCharacterSelect();
-                document.getElementById('startButton').addEventListener('click', startGame);
-                document.getElementById('restartButton').addEventListener('click', restartGame);
-                setupTouchControls();
-                
-                document.getElementById('startButton').disabled = !selectedCharacter;
-            });
-        };
+window.onload = function () {
+    canvas = document.getElementById('gameCanvas');
+    ctx = canvas.getContext('2d');
+    ctx.imageSmoothingEnabled = true;
+
+    resizeCanvas();
+    window.addEventListener('resize', resizeCanvas);
+    document.addEventListener('fullscreenchange', resizeCanvas);
+    setupCharacterSelectSelection(); // nome correto aqui
+    document.getElementById('startButton').addEventListener('click', startGame);
+    document.getElementById('restartButton').addEventListener('click', restartGame);
+    setupTouchControls();
+
+    document.getElementById('startButton').disabled = !selectedCharacter;
+};
+
 
         function resizeCanvas() {
             const container = document.getElementById('gameContainer');
