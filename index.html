@@ -179,6 +179,49 @@
         .touchButton:active {
             background-color: rgba(255, 255, 255, 0.4);
         }
+        
+        /* Inventory Display Styles */
+        #inventoryDisplay {
+            margin: 2rem 0;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            max-width: 90%;
+        }
+        
+        #inventoryDisplay h3 {
+            color: #ffa500;
+            margin-bottom: 1rem;
+            text-shadow: 2px 2px 4px #000;
+        }
+        
+        #inventoryGrid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(50px, 1fr));
+            gap: 10px;
+            max-width: 400px;
+            width: 100%;
+        }
+        
+        .inventoryItem {
+            width: 50px;
+            height: 50px;
+            border: 2px solid #666;
+            border-radius: 5px;
+            background-color: #333;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            overflow: hidden;
+            box-shadow: 0 2px 5px rgba(0,0,0,0.5);
+        }
+        
+        .inventoryItem img {
+            max-width: 100%;
+            max-height: 100%;
+            object-fit: contain;
+        }
+        
         @media (max-width: 600px) {
             #touchControls {
                 display: flex;
@@ -200,6 +243,13 @@
             .upgradeButton {
                 min-width: 200px;
                 font-size: 14px;
+            }
+            .inventoryItem {
+                width: 40px;
+                height: 40px;
+            }
+            #inventoryGrid {
+                max-width: 320px;
             }
         }
         @media (orientation: portrait) and (max-width: 600px) {
@@ -264,6 +314,12 @@
             <div id="finalScore">Satoshis: 0</div>
             <div id="finalTime">Time: 0</div>
             <div id="finalPhase">Phase: 1</div>
+            
+            <div id="inventoryDisplay">
+                <h3>Items Collected</h3>
+                <div id="inventoryGrid"></div>
+            </div>
+            
             <button id="restartButton">Play Again</button>
         </div>
 
@@ -323,6 +379,11 @@
         bitcoinSprite.src = 'https://upload.wikimedia.org/wikipedia/commons/thumb/4/46/Bitcoin.svg/512px-Bitcoin.svg.png';
         let assetsLoaded = 0;
         let totalAssets = 0;
+        
+        // Collectible Items System
+        let collectedItems = []; // Persistent inventory between game attempts
+        let currentPhaseItem = null; // Current phase collectible item
+        const TOTAL_COLLECTIBLE_ITEMS = 10; // Items numbered from 1.png to 10.png
         
         // Upgrade System
         let playerKills = 0;
@@ -449,6 +510,11 @@
                 });
             }
 
+            if (currentPhaseItem) {
+                currentPhaseItem.width = TILE_SIZE * 0.8;
+                currentPhaseItem.height = TILE_SIZE * 0.8;
+            }
+
             if (Array.isArray(explosions)) {
                 explosions.forEach(explosion => {
                     explosion.radius = BOMB_RADIUS * (CANVAS_WIDTH / 800);
@@ -476,6 +542,111 @@
 
                 option.addEventListener('click', selectCharacter);
                 option.addEventListener('touchstart', selectCharacter, { passive: false });
+            });
+        }
+
+        // Collectible Items Functions
+        function getAvailableCollectibleItems() {
+            const availableItems = [];
+            for (let i = 1; i <= TOTAL_COLLECTIBLE_ITEMS; i++) {
+                if (!collectedItems.includes(i)) {
+                    availableItems.push(i);
+                }
+            }
+            return availableItems;
+        }
+
+        function spawnCollectibleItem() {
+            const availableItems = getAvailableCollectibleItems();
+            
+            // If all items are collected, don't spawn new ones
+            if (availableItems.length === 0) {
+                currentPhaseItem = null;
+                return;
+            }
+            
+            // Select random available item
+            const randomItemId = availableItems[Math.floor(Math.random() * availableItems.length)];
+            const pos = findEmptyCell();
+            
+            const itemImage = new Image();
+            itemImage.src = `collectabes/${randomItemId}.png`;
+            
+            currentPhaseItem = {
+                x: pos.x * TILE_SIZE + TILE_SIZE/2,
+                y: pos.y * TILE_SIZE + TILE_SIZE/2,
+                width: TILE_SIZE * 0.8,
+                height: TILE_SIZE * 0.8,
+                id: randomItemId,
+                image: itemImage,
+                collected: false
+            };
+        }
+
+        function checkCollectibleItemCollection() {
+            if (!currentPhaseItem || currentPhaseItem.collected) return;
+            
+            const dx = currentPhaseItem.x - player.x;
+            const dy = currentPhaseItem.y - player.y;
+            const distance = Math.sqrt(dx * dx + dy * dy);
+            
+            if (distance < (currentPhaseItem.width + player.collisionWidth) / 2) {
+                currentPhaseItem.collected = true;
+                collectedItems.push(currentPhaseItem.id);
+                
+                // Visual feedback
+                satoshis += 50000;
+                updateHUD();
+                
+                console.log(`Collected item ${currentPhaseItem.id}! Total collected: ${collectedItems.length}`);
+            }
+        }
+
+        function drawCollectibleItem() {
+            if (!currentPhaseItem || currentPhaseItem.collected) return;
+            
+            // Add glow effect
+            ctx.save();
+            ctx.shadowColor = '#0ff';
+            ctx.shadowBlur = 10;
+            
+            ctx.drawImage(
+                currentPhaseItem.image, 
+                currentPhaseItem.x - currentPhaseItem.width/2, 
+                currentPhaseItem.y - currentPhaseItem.height/2, 
+                currentPhaseItem.width, 
+                currentPhaseItem.height
+            );
+            
+            ctx.restore();
+        }
+
+        function displayInventoryOnGameOver() {
+            const inventoryGrid = document.getElementById('inventoryGrid');
+            inventoryGrid.innerHTML = '';
+            
+            if (collectedItems.length === 0) {
+                inventoryGrid.innerHTML = '<p style="color: #888; grid-column: 1 / -1; text-align: center;">No items collected yet</p>';
+                return;
+            }
+            
+            // Sort collected items for consistent display
+            const sortedItems = [...collectedItems].sort((a, b) => a - b);
+            
+            sortedItems.forEach(itemId => {
+                const itemDiv = document.createElement('div');
+                itemDiv.className = 'inventoryItem';
+                
+                const itemImg = document.createElement('img');
+                itemImg.src = `collectabes/${itemId}.png`;
+                itemImg.alt = `Item ${itemId}`;
+                itemImg.onerror = () => {
+                    // Fallback if image doesn't load
+                    itemDiv.innerHTML = `<span style="color: #fff; font-size: 12px;">${itemId}</span>`;
+                };
+                
+                itemDiv.appendChild(itemImg);
+                inventoryGrid.appendChild(itemDiv);
             });
         }
 
@@ -544,6 +715,7 @@
                 };
                 
                 placeBitcoins();
+                spawnCollectibleItem(); // Spawn collectible item for first phase
                 spawnEnemies(3 + selectedCharacter);
                 lastTime = performance.now();
                 gameInterval = requestAnimationFrame(gameLoop);
@@ -565,91 +737,6 @@
             const loadImage = (path, fallbackColor) => {
                 return new Promise((resolve) => {
                     const img = new Image();
-                    img.onload = () => {
-                        assetsLoaded++;
-                        updateLoadingProgress();
-                        resolve(img);
-                    };
-                    img.onerror = () => {
-                        console.warn(`Failed to load image: ${path}`);
-                        const canvas = document.createElement('canvas');
-                        canvas.width = 64;
-                        canvas.height = 64;
-                        const ctx = canvas.getContext('2d');
-                        ctx.fillStyle = fallbackColor;
-                        ctx.fillRect(0, 0, 64, 64);
-                        ctx.fillStyle = '#000';
-                        ctx.font = '10px Arial';
-                        ctx.fillText(`M${character}`, 10, 30);
-                        assetsLoaded++;
-                        updateLoadingProgress();
-                        resolve(canvas);
-                    };
-                    img.src = path;
-                });
-            };
-            
-            for (const anim of animations) {
-                for (let i = 0; i <= 11; i++) {
-                    const num = i.toString().padStart(3, '0');
-                    const path = `M${character}/${anim}/Minotaur_0${character}_${anim}_${num}.png`;
-                    const fallbackColor = character === 1 ? '#a52' : character === 2 ? '#5a5' : '#55a';
-                    const img = await loadImage(path, fallbackColor);
-                    playerSprites[anim.toLowerCase()].push(img);
-                }
-            }
-        }
-
-        async function loadEnemySprites() {
-            const enemyTypes = Object.values(ENEMY_TYPES).map(type => type.name);
-            const animations = ['walking', 'attack'];
-            totalAssets += enemyTypes.length * animations.length * 11;
-            
-            const loadImage = (path) => {
-                return new Promise((resolve) => {
-                    const img = new Image();
-                    img.onload = () => {
-                        assetsLoaded++;
-                        updateLoadingProgress();
-                        resolve(img);
-                    };
-                    img.onerror = () => {
-                        console.warn(`Failed to load image: ${path}`);
-                        const canvas = document.createElement('canvas');
-                        canvas.width = 64;
-                        canvas.height = 64;
-                        const ctx = canvas.getContext('2d');
-                        ctx.fillStyle = '#666';
-                        ctx.fillRect(0, 0, 64, 64);
-                        ctx.fillStyle = '#000';
-                        ctx.font = '10px Arial';
-                        ctx.fillText('Enemy', 10, 30);
-                        assetsLoaded++;
-                        updateLoadingProgress();
-                        resolve(canvas);
-                    };
-                    img.src = path;
-                });
-            };
-            
-            for (const enemyType of enemyTypes) {
-                const enemyNumber = enemyType.split('_').pop();
-                enemySprites[enemyType] = { walking: [], attack: [] };
-                for (const anim of animations) {
-                    for (let i = 1; i <= 11; i++) {
-                        const path = `enemies/${enemyNumber}/${anim}/${i}.png`;
-                        const img = await loadImage(path);
-                        enemySprites[enemyType][anim].push(img);
-                    }
-                }
-            }
-        }
-
-        async function loadMapAssets() {
-            totalAssets += 4; // For wall1, wall2, floor1, floor2
-            
-            const loadImage = (img, path) => {
-                return new Promise((resolve) => {
                     img.onload = () => {
                         assetsLoaded++;
                         updateLoadingProgress();
@@ -697,6 +784,7 @@
             assetsLoaded = 0;
             totalAssets = 0;
             playerKills = 0;
+            currentPhaseItem = null; // Reset current phase item
             updateHUD();
         }
 
@@ -1225,6 +1313,7 @@
             player.y = startPos.y * TILE_SIZE + TILE_SIZE/2;
             
             placeBitcoins();
+            spawnCollectibleItem(); // Spawn new collectible item for the new phase
             
             const enemyCount = Math.min(3 + selectedCharacter + currentPhase, 10);
             spawnEnemies(enemyCount);
@@ -1285,6 +1374,9 @@
                     player.y = newY;
                 }
             }
+            
+            // Check collectible item collection
+            checkCollectibleItemCollection();
             
             for (let enemy of enemies) {
                 enemy.animationTimer += deltaTime;
@@ -1369,7 +1461,7 @@
                     
                     if (currentAnimation === 'dying') {
                         gameOver();
-                    } else if (currentAnimation === 'attacking') {
+                    } else                     if (currentAnimation === 'attacking') {
                         player.isAttacking = false;
                         currentAnimation = 'idle';
                     }
@@ -1415,6 +1507,7 @@
             enemies = [];
             explosions = [];
             bitcoinsCollected = 0;
+            currentPhaseItem = null; // Reset current phase item
             
             generateMaze();
             
@@ -1429,6 +1522,10 @@
             document.getElementById('finalScore').textContent = `Satoshis: ${satoshis}`;
             document.getElementById('finalTime').textContent = `Time: ${Math.floor(gameTime/1000)}s`;
             document.getElementById('finalPhase').textContent = `Phase: ${currentPhase}`;
+            
+            // Display collected items inventory
+            displayInventoryOnGameOver();
+            
             document.getElementById('gameOverScreen').style.display = 'flex';
         }
 
@@ -1451,6 +1548,7 @@
             
             drawMaze();
             drawBitcoins();
+            drawCollectibleItem(); // Draw collectible item
             drawEnemies();
             drawExplosions();
             drawPlayer();
@@ -1580,3 +1678,88 @@
     </script>
 </body>
 </html>
+                        const canvas = document.createElement('canvas');
+                        canvas.width = 64;
+                        canvas.height = 64;
+                        const ctx = canvas.getContext('2d');
+                        ctx.fillStyle = fallbackColor;
+                        ctx.fillRect(0, 0, 64, 64);
+                        ctx.fillStyle = '#000';
+                        ctx.font = '10px Arial';
+                        ctx.fillText(`M${character}`, 10, 30);
+                        assetsLoaded++;
+                        updateLoadingProgress();
+                        resolve(canvas);
+                    };
+                    img.src = path;
+                });
+            };
+            
+            for (const anim of animations) {
+                for (let i = 0; i <= 11; i++) {
+                    const num = i.toString().padStart(3, '0');
+                    const path = `M${character}/${anim}/Minotaur_0${character}_${anim}_${num}.png`;
+                    const fallbackColor = character === 1 ? '#a52' : character === 2 ? '#5a5' : '#55a';
+                    const img = await loadImage(path, fallbackColor);
+                    playerSprites[anim.toLowerCase()].push(img);
+                }
+            }
+        }
+
+        async function loadEnemySprites() {
+            const enemyTypes = Object.values(ENEMY_TYPES).map(type => type.name);
+            const animations = ['walking', 'attack'];
+            totalAssets += enemyTypes.length * animations.length * 11;
+            
+            const loadImage = (path) => {
+                return new Promise((resolve) => {
+                    const img = new Image();
+                    img.onload = () => {
+                        assetsLoaded++;
+                        updateLoadingProgress();
+                        resolve(img);
+                    };
+                    img.onerror = () => {
+                        console.warn(`Failed to load image: ${path}`);
+                        const canvas = document.createElement('canvas');
+                        canvas.width = 64;
+                        canvas.height = 64;
+                        const ctx = canvas.getContext('2d');
+                        ctx.fillStyle = '#666';
+                        ctx.fillRect(0, 0, 64, 64);
+                        ctx.fillStyle = '#000';
+                        ctx.font = '10px Arial';
+                        ctx.fillText('Enemy', 10, 30);
+                        assetsLoaded++;
+                        updateLoadingProgress();
+                        resolve(canvas);
+                    };
+                    img.src = path;
+                });
+            };
+            
+            for (const enemyType of enemyTypes) {
+                const enemyNumber = enemyType.split('_').pop();
+                enemySprites[enemyType] = { walking: [], attack: [] };
+                for (const anim of animations) {
+                    for (let i = 1; i <= 11; i++) {
+                        const path = `enemies/${enemyNumber}/${anim}/${i}.png`;
+                        const img = await loadImage(path);
+                        enemySprites[enemyType][anim].push(img);
+                    }
+                }
+            }
+        }
+
+        async function loadMapAssets() {
+            totalAssets += 4; // For wall1, wall2, floor1, floor2
+            
+            const loadImage = (img, path) => {
+                return new Promise((resolve) => {
+                    img.onload = () => {
+                        assetsLoaded++;
+                        updateLoadingProgress();
+                        resolve(img);
+                    };
+                    img.onerror = () => {
+                        console.warn(`Failed to load image: ${path}`);
