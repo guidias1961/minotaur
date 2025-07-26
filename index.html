@@ -1196,6 +1196,9 @@
                 if (explosions[i].time <= 0) {
                     explosions.splice(i, 1);
                 }
+	for (let explosion of explosions) {
+    explosion.time -= deltaTime;
+}
             }
             
             animationTimer += deltaTime;
@@ -1365,21 +1368,35 @@
             }
         }
 
-        function drawExplosions() {
-            for (let explosion of explosions) {
-                const alpha = explosion.time / BOMB_EXPLOSION_DURATION;
-                ctx.globalAlpha = alpha;
-                ctx.fillStyle = '#f80';
-                ctx.beginPath();
-                ctx.arc(explosion.x, explosion.y, explosion.radius, 0, Math.PI * 2);
-                ctx.fill();
-                ctx.fillStyle = '#ff0';
-                ctx.beginPath();
-                ctx.arc(explosion.x, explosion.y, explosion.radius / 2, 0, Math.PI * 2);
-                ctx.fill();
-                ctx.globalAlpha = 1;
-            }
-        }
+       function drawExplosions() {
+    for (let explosion of explosions) {
+        const alpha = explosion.time / BOMB_EXPLOSION_DURATION;
+
+        ctx.save();
+        ctx.globalAlpha = alpha;
+
+        // Animação de expansão
+        const scale = 1 + (1 - alpha) * 1.5;
+        const radius = explosion.radius * scale;
+
+        // Gradiente radial para aparência de explosão
+        const gradient = ctx.createRadialGradient(
+            explosion.x, explosion.y, 0,
+            explosion.x, explosion.y, radius
+        );
+        gradient.addColorStop(0, `rgba(255,255,0,${alpha})`);
+        gradient.addColorStop(0.4, `rgba(255,128,0,${alpha})`);
+        gradient.addColorStop(1, `rgba(128,0,0,0)`);
+
+        ctx.fillStyle = gradient;
+        ctx.beginPath();
+        ctx.arc(explosion.x, explosion.y, radius, 0, Math.PI * 2);
+        ctx.fill();
+
+        ctx.restore();
+    }
+}
+
 
         function drawPlayer() {
             if (!playerSprites[currentAnimation]?.length) return;
