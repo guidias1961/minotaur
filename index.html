@@ -80,7 +80,7 @@
             border-color: gold;
             box-shadow: 0 0 15px gold;
         }
-        #startScreen, #gameOverScreen, #loadingScreen, #orientationWarning {
+        #startScreen, #gameOverScreen, #loadingScreen, #orientationWarning, #upgradeScreen {
             position: absolute;
             top: 0;
             left: 0;
@@ -94,7 +94,7 @@
             z-index: 10;
             padding: 1rem;
         }
-        #gameOverScreen, #loadingScreen, #orientationWarning {
+        #gameOverScreen, #loadingScreen, #orientationWarning, #upgradeScreen {
             display: none;
         }
         button {
@@ -129,12 +129,35 @@
             gap: 0.5rem;
             z-index: 5;
         }
+        #relicsHUD {
+            position: absolute;
+            top: 50px;
+            left: 10px;
+            color: #ffd700;
+            font-size: clamp(12px, 1.8vw, 14px);
+            z-index: 5;
+        }
         .instructions {
             margin: 1rem;
             text-align: center;
             color: #aaa;
             font-size: clamp(12px, 1.8vw, 14px);
             max-width: 90%;
+        }
+        .upgradeOption {
+            width: 200px;
+            padding: 1rem;
+            margin: 0.5rem;
+            background-color: #333;
+            border: 2px solid #555;
+            border-radius: 5px;
+            cursor: pointer;
+            text-align: center;
+            transition: all 0.3s;
+        }
+        .upgradeOption:hover {
+            border-color: #888;
+            transform: scale(1.05);
         }
         #touchControls {
             position: fixed;
@@ -178,6 +201,10 @@
                 top: 0;
                 left: 0;
             }
+            .upgradeOption {
+                width: 150px;
+                padding: 0.8rem;
+            }
         }
         @media (orientation: portrait) and (max-width: 600px) {
             #orientationWarning {
@@ -207,6 +234,7 @@
             <div id="bombs">Bombs: 0</div>
             <div id="phase">Phase: 1</div>
         </div>
+        <div id="relicsHUD"></div>
         <canvas id="gameCanvas"></canvas>
         
         <div id="loadingScreen">
@@ -244,6 +272,11 @@
             <button id="restartButton">Play Again</button>
         </div>
 
+        <div id="upgradeScreen">
+            <h2>Choose an Upgrade</h2>
+            <div id="upgradeOptions"></div>
+        </div>
+
         <div id="orientationWarning">
             <h2>Gire o celular para jogar melhor em modo paisagem 🎮</h2>
         </div>
@@ -279,7 +312,7 @@
         let canvas, ctx;
         let gameRunning = false;
         let selectedCharacter = null;
-        let player, enemies = [], bitcoins = [], explosions = [];
+        let player, enemies = [], bitcoins = [], relics = [], explosions = [];
         let maze = [];
         let wallHealth = [];
         let satoshis = 0;
@@ -291,6 +324,8 @@
         let lastTime = 0;
         let bitcoinSprite = new Image();
         bitcoinSprite.src = 'https://upload.wikimedia.org/wikipedia/commons/thumb/4/46/Bitcoin.svg/512px-Bitcoin.svg.png';
+        let relicSprite = new Image();
+        relicSprite.src = 'https://upload.wikimedia.org/wikipedia/commons/thumb/9/94/Relic_icon.png/512px-Relic_icon.png';
         let assetsLoaded = 0;
         let totalAssets = 0;
         
@@ -326,6 +361,19 @@
             4: { name: 'Zombie_Villager_4', satoshis: 25000, baseHealth: 4, baseSpeed: BASE_ENEMY_SPEED * 0.9 },
             5: { name: 'Zombie_Villager_5', satoshis: 30000, baseHealth: 2, baseSpeed: BASE_ENEMY_SPEED * 1.3 }
         };
+
+        // Upgrade and Relic Definitions
+        const UPGRADES = [
+            { id: 'maxHealth', name: '+1 Max Health', apply: () => player.maxHealth++ },
+            { id: 'attackRange', name: '+20% Attack Range', apply: () => player.attackRange *= 1.2 },
+            { id: 'bombsPerPhase', name: '+1 Bomb per Phase', apply: () => player.bombsPerPhase++ },
+            { id: 'speed', name: '+10% Movement Speed', apply: () => player.speed *= 1.1 }
+        ];
+
+        const RELICS = [
+            { id: 'extraSatoshis', name: 'Wealth Rune', effect: '1000 satoshis per kill', apply: () => {} },
+            { id: 'explodeChance', name: 'Blast Shard', effect: '10% chance for enemies to explode on death', apply: () => {} }
+        ];
 
         // Initialize
         window.onload = function() {
@@ -365,7 +413,7 @@
                 player.height = TILE_SIZE * 1.1;
                 player.collisionWidth = TILE_SIZE * 0.8;
                 player.collisionHeight = TILE_SIZE * 0.8;
-                player.speed = BASE_PLAYER_SPEED * (CANVAS_WIDTH / 800);
+                player.speed = player.baseSpeed * (CANVAS_WIDTH / 800);
             }
 
             if (Array.isArray(enemies)) {
@@ -380,6 +428,13 @@
                 bitcoins.forEach(bitcoin => {
                     bitcoin.width = TILE_SIZE / 2;
                     bitcoin.height = TILE_SIZE / 2;
+                });
+            }
+
+            if (Array.isArray(relics)) {
+                relics.forEach(relic => {
+                    relic.width = TILE_SIZE / 2;
+                    relic.height = TILE_SIZE / 2;
                 });
             }
 
@@ -419,7 +474,6 @@
                 return;
             }
 
-            // Enter fullscreen on desktop
             if (!/Mobi|Android/i.test(navigator.userAgent)) {
                 try {
                     await document.getElementById('gameContainer').requestFullscreen();
@@ -436,7 +490,8 @@
                 await Promise.all([
                     loadSprites(selectedCharacter),
                     loadEnemySprites(),
-                    loadMapAssets()
+                    loadMapAssets(),
+                    loadRelicSprite()
                 ]);
                 
                 document.getElementById('loadingScreen').style.display = 'none';
@@ -446,17 +501,17 @@
                 
                 generateMaze();
                 
-let startPos;
-do {
-    startPos = findEmptyCell();
-} while (
-    checkWallCollision(
-        startPos.x * TILE_SIZE + TILE_SIZE / 2,
-        startPos.y * TILE_SIZE + TILE_SIZE / 2,
-        TILE_SIZE * 0.8,
-        TILE_SIZE * 0.8
-    )
-);
+                let startPos;
+                do {
+                    startPos = findEmptyCell();
+                } while (
+                    checkWallCollision(
+                        startPos.x * TILE_SIZE + TILE_SIZE / 2,
+                        startPos.y * TILE_SIZE + TILE_SIZE / 2,
+                        TILE_SIZE * 0.8,
+                        TILE_SIZE * 0.8
+                    )
+                );
                 player = {
                     x: startPos.x * TILE_SIZE + TILE_SIZE/2,
                     y: startPos.y * TILE_SIZE + TILE_SIZE/2,
@@ -464,15 +519,21 @@ do {
                     height: TILE_SIZE * 1.1,
                     collisionWidth: TILE_SIZE * 0.8,
                     collisionHeight: TILE_SIZE * 0.8,
+                    baseSpeed: BASE_PLAYER_SPEED,
                     speed: BASE_PLAYER_SPEED * (CANVAS_WIDTH/800),
                     direction: { x: 0, y: 0 },
                     isAttacking: false,
                     attackCooldown: 0,
                     health: 3,
+                    maxHealth: 3,
+                    attackRange: 1.5,
+                    bombsPerPhase: 0,
+                    relics: [],
                     isDying: false
                 };
                 
                 placeBitcoins();
+                placeRelic();
                 spawnEnemies(3 + selectedCharacter);
                 lastTime = performance.now();
                 gameInterval = requestAnimationFrame(gameLoop);
@@ -575,7 +636,7 @@ do {
         }
 
         async function loadMapAssets() {
-            totalAssets += 4; // For wall1, wall2, floor1, floor2
+            totalAssets += 4;
             
             const loadImage = (img, path) => {
                 return new Promise((resolve) => {
@@ -608,6 +669,33 @@ do {
             ]);
         }
 
+        async function loadRelicSprite() {
+            totalAssets += 1;
+            return new Promise((resolve) => {
+                relicSprite.onload = () => {
+                    assetsLoaded++;
+                    updateLoadingProgress();
+                    resolve(relicSprite);
+                };
+                relicSprite.onerror = () => {
+                    console.warn('Failed to load relic sprite');
+                    const canvas = document.createElement('canvas');
+                    canvas.width = 32;
+                    canvas.height = 32;
+                    const ctx = canvas.getContext('2d');
+                    ctx.fillStyle = '#ffd700';
+                    ctx.fillRect(0, 0, 32, 32);
+                    ctx.fillStyle = '#000';
+                    ctx.font = '10px Arial';
+                    ctx.fillText('R', 10, 20);
+                    assetsLoaded++;
+                    updateLoadingProgress();
+                    resolve(canvas);
+                };
+                relicSprite.src = 'https://upload.wikimedia.org/wikipedia/commons/thumb/9/94/Relic_icon.png/512px-Relic_icon.png';
+            });
+        }
+
         function updateLoadingProgress() {
             const progress = Math.round((assetsLoaded / totalAssets) * 100);
             document.getElementById('loadingProgress').textContent = `${progress}%`;
@@ -621,6 +709,7 @@ do {
             currentPhase = 1;
             enemies = [];
             bitcoins = [];
+            relics = [];
             explosions = [];
             wallHealth = [];
             assetsLoaded = 0;
@@ -644,6 +733,7 @@ do {
                         }
                     }
                     return;
+ Ledger
                 }
                 
                 const horizontal = orientation === 'horizontal';
@@ -761,6 +851,21 @@ do {
                     collected: false
                 });
             }
+        }
+
+        function placeRelic() {
+            const pos = findEmptyCell(true);
+            const relic = RELICS[Math.floor(Math.random() * RELICS.length)];
+            relics.push({
+                x: pos.x * TILE_SIZE + TILE_SIZE/2,
+                y: pos.y * TILE_SIZE + TILE_SIZE/2,
+                width: TILE_SIZE/2,
+                height: TILE_SIZE/2,
+                relicId: relic.id,
+                name: relic.name,
+                effect: relic.effect,
+                collected: false
+            });
         }
 
         function spawnEnemies(count) {
@@ -1034,6 +1139,7 @@ do {
                 
                 if (distance < BOMB_RADIUS * (CANVAS_WIDTH/800)) {
                     satoshis += enemy.type.satoshis + 5000;
+                    handleEnemyDeath(enemy);
                     enemies.splice(i, 1);
                     setTimeout(() => {
                         if (gameRunning) spawnEnemies(1);
@@ -1045,7 +1151,7 @@ do {
         }
 
         function checkAttack() {
-            const attackRadius = TILE_SIZE * 1.5;
+            const attackRadius = TILE_SIZE * player.attackRange;
             const COLS = Math.floor(CANVAS_WIDTH / TILE_SIZE);
             const ROWS = Math.floor(CANVAS_HEIGHT / TILE_SIZE);
             
@@ -1060,6 +1166,7 @@ do {
                     
                     if (enemy.health <= 0) {
                         satoshis += enemy.type.satoshis;
+                        handleEnemyDeath(enemy);
                         enemies.splice(i, 1);
                         setTimeout(() => {
                             if (gameRunning) spawnEnemies(1);
@@ -1088,6 +1195,69 @@ do {
             }
             
             updateHUD();
+        }
+
+        function handleEnemyDeath(enemy) {
+            if (player.relics.includes('extraSatoshis')) {
+                satoshis += 1000;
+            }
+            if (player.relics.includes('explodeChance') && Math.random() < 0.1) {
+                explosions.push({
+                    x: enemy.x,
+                    y: enemy.y,
+                    radius: BOMB_RADIUS * (CANVAS_WIDTH/800),
+                    time: BOMB_EXPLOSION_DURATION
+                });
+                for (let i = enemies.length - 1; i >= 0; i--) {
+                    const otherEnemy = enemies[i];
+                    if (otherEnemy !== enemy) {
+                        const dx = otherEnemy.x - enemy.x;
+                        const dy = otherEnemy.y - enemy.y;
+                        const distance = Math.sqrt(dx * dx + dy * dy);
+                        if (distance < BOMB_RADIUS * (CANVAS_WIDTH/800)) {
+                            satoshis += otherEnemy.type.satoshis;
+                            enemies.splice(i, 1);
+                            setTimeout(() => {
+                                if (gameRunning) spawnEnemies(1);
+                            }, 2000);
+                        }
+                    }
+                }
+            }
+            updateHUD();
+        }
+
+        function showUpgradeScreen() {
+            gameRunning = false;
+            cancelAnimationFrame(gameInterval);
+            document.getElementById('upgradeScreen').style.display = 'flex';
+            const upgradeOptions = document.getElementById('upgradeOptions');
+            upgradeOptions.innerHTML = '';
+
+            const availableUpgrades = [...UPGRADES];
+            const selectedUpgrades = [];
+            for (let i = 0; i < 3; i++) {
+                if (availableUpgrades.length === 0) break;
+                const randomIndex = Math.floor(Math.random() * availableUpgrades.length);
+                selectedUpgrades.push(availableUpgrades.splice(randomIndex, 1)[0]);
+            }
+
+            selectedUpgrades.forEach(upgrade => {
+                const div = document.createElement('div');
+                div.className = 'upgradeOption';
+                div.textContent = upgrade.name;
+                div.addEventListener('click', () => {
+                    upgrade.apply();
+                    if (upgrade.id === 'maxHealth') {
+                        player.health = player.maxHealth;
+                    }
+                    document.getElementById('upgradeScreen').style.display = 'none';
+                    gameRunning = true;
+                    lastTime = performance.now();
+                    gameInterval = requestAnimationFrame(gameLoop);
+                });
+                upgradeOptions.appendChild(div);
+            });
         }
 
         function gameLoop(timestamp) {
@@ -1145,7 +1315,7 @@ do {
                 const dx = enemy.x - player.x;
                 const dy = player.y - player.y;
                 const distance = Math.sqrt(dx * dx + dy * dy);
-                enemy.animationState = distance < TILE_SIZE * 1.5 ? 'attack' : 'walking';
+                enemy.animationState = distance < TILE_SIZE * player.attackRange ? 'attack' : 'walking';
                 
                 enemy.angle = Math.atan2(dy, dx);
                 
@@ -1202,13 +1372,28 @@ do {
                 }
             }
             
+            for (let i = relics.length - 1; i >= 0; i--) {
+                const relic = relics[i];
+                if (!relic.collected) {
+                    const dx = relic.x - player.x;
+                    const dy = relic.y - player.y;
+                    const distance = Math.sqrt(dx * dx + dy * dy);
+                    
+                    if (distance < (relic.width + player.collisionWidth) / 2) {
+                        relic.collected = true;
+                        player.relics.push(relic.relicId);
+                        updateRelicsHUD();
+                    }
+                }
+            }
+            
             for (let i = explosions.length - 1; i >= 0; i--) {
                 if (explosions[i].time <= 0) {
                     explosions.splice(i, 1);
                 }
-	for (let explosion of explosions) {
-    explosion.time -= deltaTime;
-}
+                for (let explosion of explosions) {
+                    explosion.time -= deltaTime;
+                }
             }
             
             animationTimer += deltaTime;
@@ -1264,10 +1449,11 @@ do {
         function advanceToNext() {
             currentPhase++;
             bitcoins = [];
+            relics = [];
             enemies = [];
             explosions = [];
             bitcoinsCollected = 0;
-            bombs = 0;
+            bombs = player.bombsPerPhase;
             
             generateMaze();
             
@@ -1276,16 +1462,18 @@ do {
             player.y = startPos.y * TILE_SIZE + TILE_SIZE/2;
             
             placeBitcoins();
+            placeRelic();
             
             const enemyCount = Math.min(3 + selectedCharacter + currentPhase, 10);
             spawnEnemies(enemyCount);
             
-            if (player.health < 3) {
-                player.health = Math.min(player.health + 1, 3);
+            if (player.health < player.maxHealth) {
+                player.health = Math.min(player.health + 1, player.maxHealth);
             }
             
             satoshis += 10000000 * currentPhase;
             updateHUD();
+            showUpgradeScreen();
         }
 
         function gameOver() {
@@ -1296,6 +1484,7 @@ do {
             document.getElementById('finalTime').textContent = `Time: ${Math.floor(gameTime/1000)}s`;
             document.getElementById('finalPhase').textContent = `Phase: ${currentPhase}`;
             document.getElementById('gameOverScreen').style.display = 'flex';
+            showUpgradeScreen();
         }
 
         function restartGame() {
@@ -1311,12 +1500,21 @@ do {
             document.getElementById('phase').textContent = `Phase: ${currentPhase}`;
         }
 
+        function updateRelicsHUD() {
+            const relicsHUD = document.getElementById('relicsHUD');
+            relicsHUD.innerHTML = 'Relics:<br>' + player.relics.map(id => {
+                const relic = RELICS.find(r => r.id === id);
+                return relic ? relic.name + ': ' + relic.effect : '';
+            }).join('<br>');
+        }
+
         function render() {
             ctx.clearRect(0, 0, canvas.width, canvas.height);
             ctx.imageSmoothingEnabled = true;
             
             drawMaze();
             drawBitcoins();
+            drawRelics();
             drawEnemies();
             drawExplosions();
             drawPlayer();
@@ -1357,6 +1555,19 @@ do {
             }
         }
 
+        function drawRelics() {
+            for (let relic of relics) {
+                if (!relic.collected) {
+                    ctx.drawImage(relicSprite, relic.x - relic.width/2, relic.y - relic.height/2, relic.width, relic.height);
+                    
+                    ctx.shadowColor = '#ffd700';
+                    ctx.shadowBlur = 5;
+                    ctx.drawImage(relicSprite, relic.x - relic.width/3, relic.y - relic.height/3, relic.width/1.5, relic.height/1.5);
+                    ctx.shadowBlur = 0;
+                }
+            }
+        }
+
         function drawEnemies() {
             for (let enemy of enemies) {
                 ctx.save();
@@ -1378,35 +1589,32 @@ do {
             }
         }
 
-       function drawExplosions() {
-    for (let explosion of explosions) {
-        const alpha = explosion.time / BOMB_EXPLOSION_DURATION;
+        function drawExplosions() {
+            for (let explosion of explosions) {
+                const alpha = explosion.time / BOMB_EXPLOSION_DURATION;
 
-        ctx.save();
-        ctx.globalAlpha = alpha;
+                ctx.save();
+                ctx.globalAlpha = alpha;
 
-        // Animação de expansão
-        const scale = 1 + (1 - alpha) * 1.5;
-        const radius = explosion.radius * scale;
+                const scale = 1 + (1 - alpha) * 1.5;
+                const radius = explosion.radius * scale;
 
-        // Gradiente radial para aparência de explosão
-        const gradient = ctx.createRadialGradient(
-            explosion.x, explosion.y, 0,
-            explosion.x, explosion.y, radius
-        );
-        gradient.addColorStop(0, `rgba(255,255,0,${alpha})`);
-        gradient.addColorStop(0.4, `rgba(255,128,0,${alpha})`);
-        gradient.addColorStop(1, `rgba(128,0,0,0)`);
+                const gradient = ctx.createRadialGradient(
+                    explosion.x, explosion.y, 0,
+                    explosion.x, explosion.y, radius
+                );
+                gradient.addColorStop(0, `rgba(255,255,0,${alpha})`);
+                gradient.addColorStop(0.4, `rgba(255,128,0,${alpha})`);
+                gradient.addColorStop(1, `rgba(128,0,0,0)`);
 
-        ctx.fillStyle = gradient;
-        ctx.beginPath();
-        ctx.arc(explosion.x, explosion.y, radius, 0, Math.PI * 2);
-        ctx.fill();
+                ctx.fillStyle = gradient;
+                ctx.beginPath();
+                ctx.arc(explosion.x, explosion.y, radius, 0, Math.PI * 2);
+                ctx.fill();
 
-        ctx.restore();
-    }
-}
-
+                ctx.restore();
+            }
+        }
 
         function drawPlayer() {
             if (!playerSprites[currentAnimation]?.length) return;
@@ -1429,7 +1637,7 @@ do {
 
         function drawPlayerHealth() {
             const heartSize = Math.min(20, CANVAS_WIDTH / 40);
-            for (let i = 0; i < 3; i++) {
+            for (let i = 0; i < player.maxHealth; i++) {
                 ctx.fillStyle = i < player.health ? '#f00' : '#500';
                 
                 ctx.beginPath();
