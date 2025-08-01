@@ -268,9 +268,79 @@
                 display: block;
             }
         }
+#tokenIntro {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100vw;
+    height: 100vh;
+    background: linear-gradient(#111, #000);
+    color: #eee;
+    font-family: 'Courier New', monospace;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    align-items: center;
+    text-align: center;
+    z-index: 50;
+    padding: 2rem;
+    box-sizing: border-box;
+}
+
+#tokenIntro h1 {
+    font-size: clamp(2rem, 6vw, 3rem);
+    color: gold;
+    margin-bottom: 1rem;
+}
+
+#tokenIntro p {
+    max-width: 600px;
+    margin-bottom: 1.5rem;
+    font-size: clamp(1rem, 2.5vw, 1.2rem);
+}
+
+#tokenIntro ul {
+    list-style: none;
+    padding: 0;
+    margin-bottom: 2rem;
+    font-size: clamp(1rem, 2.5vw, 1.2rem);
+}
+
+#tokenIntro li {
+    margin: 0.3rem 0;
+}
+
+#tokenIntro button {
+    background-color: #4a2;
+    color: white;
+    font-size: 1.2rem;
+    padding: 0.7rem 2rem;
+    border: none;
+    border-radius: 8px;
+    cursor: pointer;
+}
+
+#tokenIntro button:hover {
+    background-color: #6c4;
+}
+function enterGame() {
+    document.getElementById('tokenIntro').style.display = 'none';
+}
+
     </style>
 </head>
 <body>
+<div id="tokenIntro">
+    <h1>$MINO — Minotaur Maze</h1>
+    <p>The wildest memetoken on Bitcoin. Escape the maze, collect satoshis, and fight for glory.</p>
+    <ul>
+        <li><strong>Token:</strong> $MINO (BRC-20)</li>
+        <li><strong>Launch:</strong> on <a href="https://odin.fun" target="_blank">odin.fun</a></li>
+        <li><strong>Chain:</strong> Bitcoin</li>
+    </ul>
+    <button onclick="enterGame()">Enter Game</button>
+</div>
+
     <h1>Minotaur Maze</h1>
     <div id="gameContainer">
         <div id="hud">
