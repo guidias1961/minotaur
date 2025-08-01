@@ -269,60 +269,69 @@
             }
         }
 #branding {
-    position: absolute;
-    top: 20px;
-    text-align: center;
-    z-index: 20;
-    color: #eee;
+  position: absolute;
+  top: 2vh;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 999;
+  text-align: center;
+  background: rgba(0, 0, 0, 0.65);
+  padding: 1rem 2rem;
+  border-radius: 10px;
+  box-shadow: 0 0 10px #000;
 }
 
-#branding h1 {
-    font-size: clamp(2rem, 6vw, 3rem);
-    margin-bottom: 0.5rem;
-    text-shadow: 2px 2px 6px #000;
+.branding-title {
+  font-family: 'Courier New', monospace;
+  font-size: clamp(2rem, 4vw, 3rem);
+  font-weight: bold;
+  color: #fff;
+  text-shadow: 2px 2px 4px #000;
 }
 
-.slogan {
-    font-size: clamp(1rem, 2vw, 1.5rem);
-    color: #ccc;
-    margin-bottom: 1rem;
-    text-shadow: 1px 1px 3px #000;
+.branding-slogan {
+  font-size: clamp(1rem, 2vw, 1.3rem);
+  color: #ccc;
+  margin-top: 0.5rem;
+  margin-bottom: 1rem;
+  font-family: 'Courier New', monospace;
 }
 
-.buttonContainer {
-    display: flex;
-    justify-content: center;
-    gap: 1rem;
-    flex-wrap: wrap;
+.branding-buttons {
+  display: flex;
+  justify-content: center;
+  gap: 1rem;
+  flex-wrap: wrap;
 }
 
-.actionButton {
-    background-color: #a24;
-    color: white;
-    padding: 0.6rem 1.2rem;
-    text-decoration: none;
-    border-radius: 6px;
-    font-size: clamp(14px, 1.5vw, 16px);
-    font-family: 'Courier New', monospace;
-    transition: background-color 0.3s;
+.branding-buttons a {
+  background-color: #a24;
+  color: white;
+  padding: 0.5rem 1rem;
+  font-size: clamp(14px, 1.5vw, 16px);
+  font-family: 'Courier New', monospace;
+  border-radius: 5px;
+  text-decoration: none;
+  transition: background-color 0.3s;
 }
 
-.actionButton:hover {
-    background-color: #c46;
+.branding-buttons a:hover {
+  background-color: #c46;
 }
+
 
     </style>
 </head>
 <body>
 
 <div id="branding">
-  <h1>Minotaur Maze</h1>
-  <p class="slogan">The Bitcoin Labyrinth Awaits – Only the Worthy Escape 🧠⚔️</p>
-  <div class="buttonContainer">
-    <a href="https://odin.fun" target="_blank" class="actionButton">Buy on Odin</a>
-    <a href="https://twitter.com/MinotaurMaze" target="_blank" class="actionButton">Twitter</a>
+  <div class="branding-slogan">Bitcoin Labyrinth Awaits – Only the Worthy Escape 🧠⚔️</div>
+  <div class="branding-buttons">
+    <a href="https://odin.fun" target="_blank">Buy on Odin</a>
+    <a href="https://twitter.com/MinotaurMaze" target="_blank">Twitter</a>
   </div>
 </div>
+
     <div id="gameContainer">
         <div id="hud">
             <div id="score">Satoshis: 0</div>
@@ -382,7 +391,7 @@
         </div>
 
         <div id="orientationWarning">
-            <h2>Gire o celular para jogar melhor em modo paisagem 🎮</h2>
+            <h2>Rotate your phone to landscape mode for a better experience 🎮</h2>
         </div>
     </div>
 
@@ -447,25 +456,25 @@
                 } 
             },
             { 
-                name: '+20% de Alcance de Ataque', 
+                name: '+20% Attack Range', 
                 apply: () => { 
                     player.attackRange *= 1.2; 
                 } 
             },
             { 
-                name: '+1 Bomba por Fase', 
+                name: '+1 Bomb per Phase', 
                 apply: () => { 
                     player.bombsPerPhase += 1; 
                 } 
             },
             { 
-                name: '+10% Velocidade de Movimento', 
+                name: '+10% Movement Speed', 
                 apply: () => { 
                     player.speed *= 1.1; 
                 } 
             },
             { 
-                name: 'Vampirismo Leve (cura 1 vida a cada 5 kills)', 
+                name: 'Light Vampirism (heals 1 life for every 5 kills)', 
                 apply: () => { 
                     player.lifeSteal = true; 
                 } 
